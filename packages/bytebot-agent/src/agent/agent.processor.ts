@@ -27,6 +27,7 @@ import { InputCaptureService } from './input-capture.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { OpenAIService } from '../openai/openai.service';
 import { GoogleService } from '../google/google.service';
+import { RovoService } from '../rovo/rovo.service';
 import {
   BytebotAgentModel,
   BytebotAgentService,
@@ -61,6 +62,7 @@ export class AgentProcessor {
     private readonly anthropicService: AnthropicService,
     private readonly openaiService: OpenAIService,
     private readonly googleService: GoogleService,
+    private readonly rovoService: RovoService,
     private readonly proxyService: ProxyService,
     private readonly inputCaptureService: InputCaptureService,
     private readonly enhancedRetryService: EnhancedRetryService,
@@ -71,6 +73,7 @@ export class AgentProcessor {
       anthropic: this.anthropicService,
       openai: this.openaiService,
       google: this.googleService,
+      rovo: this.rovoService,
       proxy: this.proxyService,
     };
     this.logger.log('AgentProcessor initialized');
@@ -87,6 +90,7 @@ export class AgentProcessor {
     signal?: AbortSignal,
   ): Promise<BytebotAgentResponse> {
     const fallbackProviders = [
+      { provider: 'rovo', models: ['rovo-dev-ai-v1', 'rovo-dev-ai-code-focused'] },
       { provider: 'google', models: ['gemini-2.5-flash', 'gemini-2.5-pro'] },
       {
         provider: 'anthropic',

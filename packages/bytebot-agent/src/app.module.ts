@@ -7,6 +7,7 @@ import { MessagesModule } from './messages/messages.module';
 import { AnthropicModule } from './anthropic/anthropic.module';
 import { OpenAIModule } from './openai/openai.module';
 import { GoogleModule } from './google/google.module';
+import { RovoModule } from './rovo/rovo.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -30,6 +31,7 @@ import { PatternRecognitionModule } from './pattern-recognition/pattern-recognit
     AnthropicModule,
     OpenAIModule,
     GoogleModule,
+    RovoModule,
     ProxyModule,
     PrismaModule,
     WorkflowModule,
