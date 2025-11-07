@@ -1,7 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkflowEngine } from './workflow.engine';
-import { Workflow, WorkflowExecution, WorkflowSchedule } from './workflow.types';
+import {
+  Workflow,
+  WorkflowExecution,
+  WorkflowSchedule,
+} from './workflow.types';
 
 @Injectable()
 export class WorkflowService {
@@ -27,7 +36,9 @@ export class WorkflowService {
     });
 
     if (existing) {
-      throw new BadRequestException(`Workflow ${data.name} version ${data.version} already exists`);
+      throw new BadRequestException(
+        `Workflow ${data.name} version ${data.version} already exists`,
+      );
     }
 
     // Create workflow with nodes and variables
@@ -44,35 +55,37 @@ export class WorkflowService {
         retentionDays: data.retentionDays || 30,
         createdBy: data.createdBy,
         nodes: {
-          create: data.nodes?.map((node: any) => ({
-            type: node.type,
-            name: node.name,
-            description: node.description,
-            positionX: node.position?.x || 0,
-            positionY: node.position?.y || 0,
-            config: node.config || {},
-            variables: node.variables || {},
-            retryPolicy: node.retryPolicy || {
-              maxRetries: 3,
-              backoffStrategy: 'exponential',
-              baseDelay: 1000,
-              maxDelay: 30000,
-              retryOn: ['error', 'timeout'],
-            },
-            errorAction: node.errorAction || {
-              action: 'fail',
-            },
-          })) || [],
+          create:
+            data.nodes?.map((node: any) => ({
+              type: node.type,
+              name: node.name,
+              description: node.description,
+              positionX: node.position?.x || 0,
+              positionY: node.position?.y || 0,
+              config: node.config || {},
+              variables: node.variables || {},
+              retryPolicy: node.retryPolicy || {
+                maxRetries: 3,
+                backoffStrategy: 'exponential',
+                baseDelay: 1000,
+                maxDelay: 30000,
+                retryOn: ['error', 'timeout'],
+              },
+              errorAction: node.errorAction || {
+                action: 'fail',
+              },
+            })) || [],
         },
         variables: {
-          create: data.variables?.map((variable: any) => ({
-            name: variable.name,
-            type: variable.type,
-            defaultValue: variable.defaultValue,
-            required: variable.required || false,
-            description: variable.description,
-            validation: variable.validation,
-          })) || [],
+          create:
+            data.variables?.map((variable: any) => ({
+              name: variable.name,
+              type: variable.type,
+              defaultValue: variable.defaultValue,
+              required: variable.required || false,
+              description: variable.description,
+              validation: variable.validation,
+            })) || [],
         },
       },
       include: {
@@ -90,14 +103,18 @@ export class WorkflowService {
       await this.createNodeDependencies(workflow.nodes, data.nodes);
     }
 
-    this.logger.log(`Created workflow ${workflow.name} version ${workflow.version}`);
+    this.logger.log(
+      `Created workflow ${workflow.name} version ${workflow.version}`,
+    );
     return workflow as any;
   }
 
   async updateWorkflow(id: string, data: any): Promise<Workflow> {
     const existing = await this.prisma.workflow.findUnique({
       where: { id },
-      include: { executions: { where: { status: { in: ['PENDING', 'RUNNING'] } } } },
+      include: {
+        executions: { where: { status: { in: ['PENDING', 'RUNNING'] } } },
+      },
     });
 
     if (!existing) {
@@ -106,7 +123,9 @@ export class WorkflowService {
 
     // Prevent updates if workflow is running
     if (existing.executions.length > 0) {
-      throw new BadRequestException('Cannot update workflow while executions are running');
+      throw new BadRequestException(
+        'Cannot update workflow while executions are running',
+      );
     }
 
     const updated = await this.prisma.workflow.update({
@@ -137,7 +156,9 @@ export class WorkflowService {
   async deleteWorkflow(id: string): Promise<void> {
     const existing = await this.prisma.workflow.findUnique({
       where: { id },
-      include: { executions: { where: { status: { in: ['PENDING', 'RUNNING'] } } } },
+      include: {
+        executions: { where: { status: { in: ['PENDING', 'RUNNING'] } } },
+      },
     });
 
     if (!existing) {
@@ -145,7 +166,9 @@ export class WorkflowService {
     }
 
     if (existing.executions.length > 0) {
-      throw new BadRequestException('Cannot delete workflow while executions are running');
+      throw new BadRequestException(
+        'Cannot delete workflow while executions are running',
+      );
     }
 
     await this.prisma.workflow.delete({
@@ -180,7 +203,9 @@ export class WorkflowService {
     return workflow as any;
   }
 
-  async listWorkflows(filters?: any): Promise<{ workflows: Workflow[]; total: number }> {
+  async listWorkflows(
+    filters?: any,
+  ): Promise<{ workflows: Workflow[]; total: number }> {
     const where: any = {};
 
     if (filters?.status) {
@@ -284,7 +309,9 @@ export class WorkflowService {
     return execution as any;
   }
 
-  async listExecutions(filters?: any): Promise<{ executions: WorkflowExecution[]; total: number }> {
+  async listExecutions(
+    filters?: any,
+  ): Promise<{ executions: WorkflowExecution[]; total: number }> {
     const where: any = {};
 
     if (filters?.workflowId) {
@@ -344,7 +371,9 @@ export class WorkflowService {
     }
 
     if (!['PENDING', 'RUNNING', 'PAUSED'].includes(execution.status)) {
-      throw new BadRequestException(`Execution ${executionId} cannot be cancelled (status: ${execution.status})`);
+      throw new BadRequestException(
+        `Execution ${executionId} cannot be cancelled (status: ${execution.status})`,
+      );
     }
 
     await this.prisma.workflowExecution.update({
@@ -401,7 +430,10 @@ export class WorkflowService {
     this.logger.log(`Resumed execution ${executionId} by user ${userId}`);
   }
 
-  async createSchedule(workflowId: string, scheduleData: any): Promise<WorkflowSchedule> {
+  async createSchedule(
+    workflowId: string,
+    scheduleData: any,
+  ): Promise<WorkflowSchedule> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
     });
@@ -426,11 +458,16 @@ export class WorkflowService {
       },
     });
 
-    this.logger.log(`Created schedule ${schedule.id} for workflow ${workflowId}`);
+    this.logger.log(
+      `Created schedule ${schedule.id} for workflow ${workflowId}`,
+    );
     return schedule as any;
   }
 
-  async updateSchedule(scheduleId: string, scheduleData: any): Promise<WorkflowSchedule> {
+  async updateSchedule(
+    scheduleId: string,
+    scheduleData: any,
+  ): Promise<WorkflowSchedule> {
     const schedule = await this.prisma.workflowSchedule.update({
       where: { id: scheduleId },
       data: {
@@ -458,7 +495,10 @@ export class WorkflowService {
     this.logger.log(`Deleted schedule ${scheduleId}`);
   }
 
-  async getWorkflowMetrics(workflowId: string, timeRange?: { start: Date; end: Date }): Promise<any> {
+  async getWorkflowMetrics(
+    workflowId: string,
+    timeRange?: { start: Date; end: Date },
+  ): Promise<any> {
     const where: any = { workflowId };
 
     if (timeRange) {
@@ -507,7 +547,9 @@ export class WorkflowService {
     };
   }
 
-  async validateWorkflow(workflowData: any): Promise<{ isValid: boolean; errors: string[]; warnings: string[] }> {
+  async validateWorkflow(
+    workflowData: any,
+  ): Promise<{ isValid: boolean; errors: string[]; warnings: string[] }> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -534,7 +576,9 @@ export class WorkflowService {
         if (node.dependencies) {
           for (const depId of node.dependencies) {
             if (!nodeIds.has(depId)) {
-              errors.push(`Node ${node.id} depends on non-existent node ${depId}`);
+              errors.push(
+                `Node ${node.id} depends on non-existent node ${depId}`,
+              );
             }
           }
         }
@@ -578,12 +622,17 @@ export class WorkflowService {
     // Additional validation logic
     const validation = this.validateWorkflow(data);
     if (!validation.isValid) {
-      throw new BadRequestException(`Workflow validation failed: ${validation.errors.join(', ')}`);
+      throw new BadRequestException(
+        `Workflow validation failed: ${validation.errors.join(', ')}`,
+      );
     }
   }
 
-  private async createNodeDependencies(nodes: any[], nodeData: any[]): Promise<void> {
-    const nodeMap = new Map(nodes.map(n => [n.name, n.id]));
+  private async createNodeDependencies(
+    nodes: any[],
+    nodeData: any[],
+  ): Promise<void> {
+    const nodeMap = new Map(nodes.map((n) => [n.name, n.id]));
 
     for (const nodeInfo of nodeData) {
       if (nodeInfo.dependencies && nodeInfo.dependencies.length > 0) {
@@ -606,7 +655,11 @@ export class WorkflowService {
     }
   }
 
-  private validateNodeConfiguration(node: any, errors: string[], warnings: string[]): void {
+  private validateNodeConfiguration(
+    node: any,
+    errors: string[],
+    warnings: string[],
+  ): void {
     switch (node.type) {
       case 'TASK':
         if (!node.config?.prompt) {
@@ -615,7 +668,9 @@ export class WorkflowService {
         break;
       case 'CONDITION':
         if (!node.config?.conditions) {
-          errors.push(`Condition node ${node.id} is missing conditions configuration`);
+          errors.push(
+            `Condition node ${node.id} is missing conditions configuration`,
+          );
         }
         break;
       case 'HUMAN_APPROVAL':
@@ -633,7 +688,7 @@ export class WorkflowService {
 
   private hasCycles(nodes: any[]): boolean {
     const graph = new Map<string, string[]>();
-    
+
     // Build adjacency list
     for (const node of nodes) {
       graph.set(node.id, node.dependencies || []);
@@ -669,7 +724,9 @@ export class WorkflowService {
   }
 
   private findUnreachableNodes(nodes: any[]): string[] {
-    const entryPoints = nodes.filter(n => !n.dependencies || n.dependencies.length === 0);
+    const entryPoints = nodes.filter(
+      (n) => !n.dependencies || n.dependencies.length === 0,
+    );
     const reachable = new Set<string>();
 
     const dfs = (nodeId: string) => {
@@ -677,8 +734,8 @@ export class WorkflowService {
       reachable.add(nodeId);
 
       // Find nodes that depend on this node
-      const dependents = nodes.filter(n => 
-        n.dependencies && n.dependencies.includes(nodeId)
+      const dependents = nodes.filter(
+        (n) => n.dependencies && n.dependencies.includes(nodeId),
       );
 
       for (const dependent of dependents) {
@@ -691,9 +748,7 @@ export class WorkflowService {
       dfs(entry.id);
     }
 
-    return nodes
-      .filter(n => !reachable.has(n.id))
-      .map(n => n.id);
+    return nodes.filter((n) => !reachable.has(n.id)).map((n) => n.id);
   }
 
   private calculateNextExecution(scheduleData: any): Date | null {
@@ -703,7 +758,7 @@ export class WorkflowService {
       case 'once':
         return scheduleData.executeAt ? new Date(scheduleData.executeAt) : null;
       case 'interval':
-        return scheduleData.intervalMinutes 
+        return scheduleData.intervalMinutes
           ? new Date(now.getTime() + scheduleData.intervalMinutes * 60 * 1000)
           : null;
       case 'cron':

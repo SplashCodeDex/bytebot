@@ -402,14 +402,17 @@ export class TasksService {
     // Update task status to indicate it has new guidance
     const task = await this.prisma.task.update({
       where: { id: taskId },
-      data: { 
+      data: {
         status: 'RUNNING',
         updatedAt: new Date(),
       },
     });
 
     // Emit event to restart task processing with guidance
-    this.eventEmitter.emit('task.guided', { taskId, guidance: guideTaskDto.message });
+    this.eventEmitter.emit('task.guided', {
+      taskId,
+      guidance: guideTaskDto.message,
+    });
 
     return task;
   }

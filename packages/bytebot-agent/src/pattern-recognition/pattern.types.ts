@@ -1,6 +1,15 @@
 export interface VisualPattern {
   id: string;
-  type: 'button' | 'input' | 'dropdown' | 'dialog' | 'form' | 'menu' | 'icon' | 'text' | 'image';
+  type:
+    | 'button'
+    | 'input'
+    | 'dropdown'
+    | 'dialog'
+    | 'form'
+    | 'menu'
+    | 'icon'
+    | 'text'
+    | 'image';
   confidence: number;
   boundingBox: BoundingBox;
   attributes: PatternAttributes;
@@ -168,7 +177,11 @@ export interface PatternMatchResult {
 
 export interface AutomationSuggestion {
   id: string;
-  type: 'workflow_creation' | 'pattern_learning' | 'error_handling' | 'optimization';
+  type:
+    | 'workflow_creation'
+    | 'pattern_learning'
+    | 'error_handling'
+    | 'optimization';
   title: string;
   description: string;
   confidence: number;
@@ -182,7 +195,12 @@ export interface AutomationSuggestion {
 }
 
 export interface SuggestedAction {
-  type: 'create_workflow' | 'add_pattern' | 'improve_selector' | 'add_validation' | 'handle_error';
+  type:
+    | 'create_workflow'
+    | 'add_pattern'
+    | 'improve_selector'
+    | 'add_validation'
+    | 'handle_error';
   description: string;
   parameters: Record<string, any>;
   automatable: boolean;
@@ -200,7 +218,11 @@ export interface LearningSession {
 }
 
 export interface SessionInsight {
-  type: 'repetitive_task' | 'error_prone_step' | 'optimization_opportunity' | 'new_pattern';
+  type:
+    | 'repetitive_task'
+    | 'error_prone_step'
+    | 'optimization_opportunity'
+    | 'new_pattern';
   description: string;
   evidence: any[];
   confidence: number;

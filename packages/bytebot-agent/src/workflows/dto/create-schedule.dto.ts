@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsBoolean, IsNumber, IsArray, IsObject, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsArray,
+  IsObject,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateScheduleDto {
   @IsString()

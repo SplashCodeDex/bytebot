@@ -40,7 +40,10 @@ import { SummariesService } from '../summaries/summaries.service';
 import { handleComputerToolUse } from './agent.computer-use';
 import { ProxyService } from '../proxy/proxy.service';
 import { EnhancedRetryService } from '../utils/enhanced-retry.service';
-import { PerformanceMonitorService, PerformanceMetrics } from '../monitoring/performance-monitor.service';
+import {
+  PerformanceMonitorService,
+  PerformanceMetrics,
+} from '../monitoring/performance-monitor.service';
 import { AnomalyDetectorService } from '../monitoring/anomaly-detector.service';
 
 @Injectable()
@@ -85,18 +88,25 @@ export class AgentProcessor {
   ): Promise<BytebotAgentResponse> {
     const fallbackProviders = [
       { provider: 'google', models: ['gemini-2.5-flash', 'gemini-2.5-pro'] },
-      { provider: 'anthropic', models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'] },
+      {
+        provider: 'anthropic',
+        models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+      },
       { provider: 'openai', models: ['gpt-4o', 'gpt-4o-mini'] },
     ];
 
     // Try the primary model first
     const primaryService = this.services[primaryModel.provider];
     if (!primaryService) {
-      throw new Error(`No service found for model provider: ${primaryModel.provider}`);
+      throw new Error(
+        `No service found for model provider: ${primaryModel.provider}`,
+      );
     }
 
     try {
-      this.logger.log(`Attempting to use primary model: ${primaryModel.name} (${primaryModel.provider})`);
+      this.logger.log(
+        `Attempting to use primary model: ${primaryModel.name} (${primaryModel.provider})`,
+      );
       return await primaryService.generateMessage(
         systemPrompt,
         messages,
@@ -106,9 +116,13 @@ export class AgentProcessor {
       );
     } catch (error: any) {
       // Check if this is a quota or rate limit error that we can fall back from
-      if (error.name === 'QuotaExceededError' || error.message?.includes('quota') || error.message?.includes('429')) {
+      if (
+        error.name === 'QuotaExceededError' ||
+        error.message?.includes('quota') ||
+        error.message?.includes('429')
+      ) {
         this.logger.warn(
-          `Primary model ${primaryModel.name} hit quota/rate limit. Attempting fallback...`
+          `Primary model ${primaryModel.name} hit quota/rate limit. Attempting fallback...`,
         );
 
         // Try fallback providers
@@ -120,13 +134,17 @@ export class AgentProcessor {
 
           const fallbackService = this.services[fallback.provider];
           if (!fallbackService) {
-            this.logger.warn(`Fallback service ${fallback.provider} not available`);
+            this.logger.warn(
+              `Fallback service ${fallback.provider} not available`,
+            );
             continue;
           }
 
           for (const modelName of fallback.models) {
             try {
-              this.logger.log(`Trying fallback: ${modelName} (${fallback.provider})`);
+              this.logger.log(
+                `Trying fallback: ${modelName} (${fallback.provider})`,
+              );
               const response = await fallbackService.generateMessage(
                 systemPrompt,
                 messages,
@@ -134,11 +152,13 @@ export class AgentProcessor {
                 useTools,
                 signal,
               );
-              this.logger.log(`Successfully used fallback model: ${modelName} (${fallback.provider})`);
+              this.logger.log(
+                `Successfully used fallback model: ${modelName} (${fallback.provider})`,
+              );
               return response;
             } catch (fallbackError: any) {
               this.logger.warn(
-                `Fallback model ${modelName} (${fallback.provider}) also failed: ${fallbackError.message}`
+                `Fallback model ${modelName} (${fallback.provider}) also failed: ${fallbackError.message}`,
               );
               continue;
             }
@@ -147,7 +167,7 @@ export class AgentProcessor {
 
         // If all fallbacks failed, throw the original error with additional context
         throw new Error(
-          `All AI providers failed. Primary error: ${error.message}. Please check your API keys and quotas.`
+          `All AI providers failed. Primary error: ${error.message}. Please check your API keys and quotas.`,
         );
       }
 
@@ -228,7 +248,7 @@ export class AgentProcessor {
     const iterationStartTime = Date.now();
     const startMemory = process.memoryUsage().heapUsed;
     let tokenUsage = 0;
-    let iterationCount = 1;
+    const iterationCount = 1;
 
     try {
       const task: Task = await this.tasksService.findById(taskId);
@@ -280,18 +300,20 @@ export class AgentProcessor {
       let agentResponse: BytebotAgentResponse;
 
       // Try the primary service first, with fallback support
-      agentResponse = await this.enhancedRetryService.withRetryAndCircuitBreaker(
-        () => this.generateMessageWithFallback(
-          model,
-          AGENT_SYSTEM_PROMPT,
-          messages,
-          true,
-          this.abortController.signal,
-        ),
-        `ai_provider_${model.provider}`,
-        { maxAttempts: 2, baseDelay: 1000 },
-        { failureThreshold: 3, timeout: 30000 }
-      );
+      agentResponse =
+        await this.enhancedRetryService.withRetryAndCircuitBreaker(
+          () =>
+            this.generateMessageWithFallback(
+              model,
+              AGENT_SYSTEM_PROMPT,
+              messages,
+              true,
+              this.abortController.signal,
+            ),
+          `ai_provider_${model.provider}`,
+          { maxAttempts: 2, baseDelay: 1000 },
+          { failureThreshold: 3, timeout: 30000 },
+        );
 
       tokenUsage = agentResponse.tokenUsage.totalTokens;
 
@@ -321,7 +343,7 @@ export class AgentProcessor {
 
       // Calculate if we need to summarize based on token usage
       const contextWindow = model.contextWindow || 200000; // Default to 200k if not specified
-      const contextThreshold = contextWindow * 0.60; // Start summarization at 60% for better performance
+      const contextThreshold = contextWindow * 0.6; // Start summarization at 60% for better performance
       const shouldSummarize =
         agentResponse.tokenUsage.totalTokens >= contextThreshold;
 
@@ -474,7 +496,12 @@ export class AgentProcessor {
       if (this.isProcessing && this.currentTaskId === taskId) {
         // Check if task still needs processing before scheduling next iteration
         const currentTask = await this.tasksService.findTask(taskId);
-        if (currentTask && [TaskStatus.RUNNING, TaskStatus.NEEDS_HELP].includes(currentTask.status)) {
+        if (
+          currentTask &&
+          [TaskStatus.RUNNING, TaskStatus.NEEDS_HELP].includes(
+            currentTask.status,
+          )
+        ) {
           setImmediate(() => {
             // Double-check we're still processing the same task to prevent race conditions
             if (this.isProcessing && this.currentTaskId === taskId) {
@@ -488,7 +515,7 @@ export class AgentProcessor {
       const iterationDuration = Date.now() - iterationStartTime;
       const currentMemory = process.memoryUsage().heapUsed;
       const memoryUsed = currentMemory - startMemory;
-      
+
       const performanceMetrics: PerformanceMetrics = {
         taskId,
         duration: iterationDuration,
@@ -496,11 +523,11 @@ export class AgentProcessor {
         iterationCount,
         memoryUsage: currentMemory,
         cpuUsage: process.cpuUsage().user / 1000000, // Convert to percentage approximation
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       this.performanceMonitor.recordMetrics(performanceMetrics);
-      
+
       // Detect anomalies
       const anomalies = this.anomalyDetector.analyzeMetrics(performanceMetrics);
       if (anomalies.length > 0) {
@@ -516,9 +543,8 @@ export class AgentProcessor {
         tokenUsage,
         duration: iterationDuration,
         memoryUsage: Math.round(currentMemory / 1024 / 1024), // MB
-        anomalies: anomalies.length
+        anomalies: anomalies.length,
       });
-
     } catch (error: any) {
       if (error?.name === 'BytebotAgentInterrupt') {
         this.logger.warn(`Processing aborted for task ID: ${taskId}`);
@@ -532,7 +558,11 @@ export class AgentProcessor {
         let taskStatus = TaskStatus.FAILED;
         let errorMessage = error.message;
 
-        if (error.name === 'QuotaExceededError' || error.message?.includes('quota') || error.message?.includes('All AI providers failed')) {
+        if (
+          error.name === 'QuotaExceededError' ||
+          error.message?.includes('quota') ||
+          error.message?.includes('All AI providers failed')
+        ) {
           taskStatus = TaskStatus.NEEDS_HELP;
           errorMessage = `Task paused due to API quota limits. Please check your AI provider billing and quotas, or try again later. Original error: ${error.message}`;
         } else if (error.message?.includes('rate limit')) {
@@ -540,9 +570,9 @@ export class AgentProcessor {
           errorMessage = `Task paused due to rate limiting. Please wait a moment and try again. Original error: ${error.message}`;
         }
 
-        await this.tasksService.update(taskId, { 
+        await this.tasksService.update(taskId, {
           status: taskStatus,
-          error: errorMessage
+          error: errorMessage,
         });
         this.isProcessing = false;
         this.currentTaskId = null;
@@ -569,18 +599,21 @@ export class AgentProcessor {
   /**
    * Emit progress updates for real-time monitoring
    */
-  private async emitProgressUpdate(taskId: string, progress: {
-    status: string;
-    iterationCount: number;
-    tokenUsage: number;
-    duration: number;
-    memoryUsage: number;
-    anomalies: number;
-  }): Promise<void> {
+  private async emitProgressUpdate(
+    taskId: string,
+    progress: {
+      status: string;
+      iterationCount: number;
+      tokenUsage: number;
+      duration: number;
+      memoryUsage: number;
+      anomalies: number;
+    },
+  ): Promise<void> {
     try {
       // This would emit through WebSocket or similar real-time mechanism
       this.logger.debug(`Task ${taskId} progress: ${JSON.stringify(progress)}`);
-      
+
       // Emit real-time progress updates through TasksGateway
       // Note: TasksGateway would need to be injected for this to work
       // this.tasksGateway.emitProgressUpdate(taskId, progress);

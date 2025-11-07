@@ -33,7 +33,7 @@ export class LoadBalancerService {
     responseTimeThreshold: 30000, // 30 seconds
     enableAutoScaling: true,
     scaleUpThreshold: 0.8,
-    scaleDownThreshold: 0.3
+    scaleDownThreshold: 0.3,
   };
 
   private loadHistory: LoadMetrics[] = [];
@@ -65,15 +65,17 @@ export class LoadBalancerService {
   /**
    * Intelligently distribute tasks considering load, priority, and agent capabilities
    */
-  private async distributeTasksIntelligently(tasks: Task[]): Promise<Map<string, string[]>> {
+  private async distributeTasksIntelligently(
+    tasks: Task[],
+  ): Promise<Map<string, string[]>> {
     const distribution = new Map<string, string[]>();
-    
+
     // Sort tasks by priority and estimated complexity
     const sortedTasks = this.sortTasksByPriority(tasks);
-    
+
     for (const task of sortedTasks) {
       const selectedAgent = await this.selectOptimalAgent(task);
-      
+
       if (selectedAgent) {
         const agentId = await this.agentPool.distributeTask(task);
         if (agentId) {
@@ -95,7 +97,7 @@ export class LoadBalancerService {
    */
   private async selectOptimalAgent(task: Task): Promise<string | null> {
     const poolStats = this.agentPool.getPoolStats();
-    
+
     if (poolStats.availableAgents === 0) {
       this.logger.warn('No available agents for task assignment');
       return null;
@@ -111,10 +113,16 @@ export class LoadBalancerService {
    */
   private async handleAutoScaling(metrics: LoadMetrics): Promise<void> {
     const utilizationRate = metrics.activeAgents / metrics.totalAgents;
-    
-    if (utilizationRate > this.config.scaleUpThreshold && metrics.queueLength > 5) {
+
+    if (
+      utilizationRate > this.config.scaleUpThreshold &&
+      metrics.queueLength > 5
+    ) {
       await this.scaleUp(metrics);
-    } else if (utilizationRate < this.config.scaleDownThreshold && metrics.queueLength === 0) {
+    } else if (
+      utilizationRate < this.config.scaleDownThreshold &&
+      metrics.queueLength === 0
+    ) {
       await this.scaleDown(metrics);
     }
   }
@@ -123,11 +131,13 @@ export class LoadBalancerService {
    * Scale up the number of agents
    */
   private async scaleUp(metrics: LoadMetrics): Promise<void> {
-    this.logger.log(`Scaling up: utilization ${Math.round((metrics.activeAgents / metrics.totalAgents) * 100)}%, queue: ${metrics.queueLength}`);
-    
+    this.logger.log(
+      `Scaling up: utilization ${Math.round((metrics.activeAgents / metrics.totalAgents) * 100)}%, queue: ${metrics.queueLength}`,
+    );
+
     // This would typically involve starting new agent processes or containers
     // For now, we just log the intention
-    
+
     // In a real implementation, this might:
     // 1. Start new Docker containers
     // 2. Launch new processes
@@ -143,8 +153,10 @@ export class LoadBalancerService {
       return; // Always keep at least one agent
     }
 
-    this.logger.log(`Scaling down: utilization ${Math.round((metrics.activeAgents / metrics.totalAgents) * 100)}%, queue: ${metrics.queueLength}`);
-    
+    this.logger.log(
+      `Scaling down: utilization ${Math.round((metrics.activeAgents / metrics.totalAgents) * 100)}%, queue: ${metrics.queueLength}`,
+    );
+
     // This would involve gracefully shutting down idle agents
     // For now, we just log the intention
   }
@@ -154,18 +166,23 @@ export class LoadBalancerService {
    */
   private async getCurrentLoadMetrics(): Promise<LoadMetrics> {
     const poolStats = this.agentPool.getPoolStats();
-    
+
     // Calculate tasks per second from recent history
     const recentMetrics = this.loadHistory.slice(-10);
-    const tasksPerSecond = recentMetrics.length > 1 
-      ? this.calculateTasksPerSecond(recentMetrics)
-      : 0;
+    const tasksPerSecond =
+      recentMetrics.length > 1
+        ? this.calculateTasksPerSecond(recentMetrics)
+        : 0;
 
     // Calculate average response time from recent tasks
-    const recentResponseTimes = Array.from(this.taskResponseTimes.values()).slice(-100);
-    const averageResponseTime = recentResponseTimes.length > 0
-      ? recentResponseTimes.reduce((sum, time) => sum + time, 0) / recentResponseTimes.length
-      : 0;
+    const recentResponseTimes = Array.from(
+      this.taskResponseTimes.values(),
+    ).slice(-100);
+    const averageResponseTime =
+      recentResponseTimes.length > 0
+        ? recentResponseTimes.reduce((sum, time) => sum + time, 0) /
+          recentResponseTimes.length
+        : 0;
 
     return {
       timestamp: new Date(),
@@ -175,7 +192,7 @@ export class LoadBalancerService {
       averageResponseTime,
       averageCpuUsage: 0, // Would be calculated from agent resource metrics
       averageMemoryUsage: 0, // Would be calculated from agent resource metrics
-      tasksPerSecond
+      tasksPerSecond,
     };
   }
 
@@ -184,7 +201,7 @@ export class LoadBalancerService {
    */
   private recordLoadMetrics(metrics: LoadMetrics): void {
     this.loadHistory.push(metrics);
-    
+
     // Keep only recent history (last 24 hours worth of data)
     const maxEntries = 24 * 60; // Assuming 1 metric per minute
     if (this.loadHistory.length > maxEntries) {
@@ -198,7 +215,7 @@ export class LoadBalancerService {
   recordTaskCompletion(taskId: string, startTime: Date, endTime: Date): void {
     const responseTime = endTime.getTime() - startTime.getTime();
     this.taskResponseTimes.set(taskId, responseTime);
-    
+
     // Keep only recent response times
     if (this.taskResponseTimes.size > 1000) {
       const entries = Array.from(this.taskResponseTimes.entries());
@@ -207,7 +224,9 @@ export class LoadBalancerService {
 
     // Check for performance issues
     if (responseTime > this.config.responseTimeThreshold) {
-      this.logger.warn(`Task ${taskId} took ${Math.round(responseTime / 1000)}s to complete (threshold: ${this.config.responseTimeThreshold / 1000}s)`);
+      this.logger.warn(
+        `Task ${taskId} took ${Math.round(responseTime / 1000)}s to complete (threshold: ${this.config.responseTimeThreshold / 1000}s)`,
+      );
     }
   }
 
@@ -217,12 +236,17 @@ export class LoadBalancerService {
   getLoadBalancingStats() {
     const recentMetrics = this.loadHistory.slice(-60); // Last hour
     const poolStats = this.agentPool.getPoolStats();
-    
-    const avgUtilization = recentMetrics.length > 0
-      ? recentMetrics.reduce((sum, m) => sum + (m.activeAgents / m.totalAgents), 0) / recentMetrics.length
-      : 0;
 
-    const avgResponseTime = Array.from(this.taskResponseTimes.values()).slice(-100)
+    const avgUtilization =
+      recentMetrics.length > 0
+        ? recentMetrics.reduce(
+            (sum, m) => sum + m.activeAgents / m.totalAgents,
+            0,
+          ) / recentMetrics.length
+        : 0;
+
+    const avgResponseTime = Array.from(this.taskResponseTimes.values())
+      .slice(-100)
       .reduce((sum, time, _, arr) => sum + time / arr.length, 0);
 
     return {
@@ -233,13 +257,13 @@ export class LoadBalancerService {
       totalTasksProcessed: this.taskResponseTimes.size,
       scalingEvents: {
         scaleUps: 0, // Would track actual scaling events
-        scaleDowns: 0
+        scaleDowns: 0,
       },
       performanceThresholds: {
         cpuThreshold: this.config.cpuThreshold,
         memoryThreshold: this.config.memoryThreshold,
-        responseTimeThreshold: this.config.responseTimeThreshold
-      }
+        responseTimeThreshold: this.config.responseTimeThreshold,
+      },
     };
   }
 
@@ -259,23 +283,33 @@ export class LoadBalancerService {
     const stats = this.getLoadBalancingStats();
 
     if (stats.currentUtilization > 0.9) {
-      recommendations.push('High agent utilization detected. Consider scaling up or optimizing task distribution.');
+      recommendations.push(
+        'High agent utilization detected. Consider scaling up or optimizing task distribution.',
+      );
     }
 
     if (stats.currentQueueLength > 10) {
-      recommendations.push('Large task queue detected. Consider adding more agents or increasing processing capacity.');
+      recommendations.push(
+        'Large task queue detected. Consider adding more agents or increasing processing capacity.',
+      );
     }
 
     if (stats.averageResponseTime > this.config.responseTimeThreshold) {
-      recommendations.push('Average response time exceeds threshold. Review task complexity and agent performance.');
+      recommendations.push(
+        'Average response time exceeds threshold. Review task complexity and agent performance.',
+      );
     }
 
     if (stats.currentUtilization < 0.3 && stats.currentQueueLength === 0) {
-      recommendations.push('Low utilization detected. Consider scaling down to optimize resource usage.');
+      recommendations.push(
+        'Low utilization detected. Consider scaling down to optimize resource usage.',
+      );
     }
 
     if (recommendations.length === 0) {
-      recommendations.push('Load balancing performance is within acceptable ranges.');
+      recommendations.push(
+        'Load balancing performance is within acceptable ranges.',
+      );
     }
 
     return recommendations;
@@ -283,12 +317,13 @@ export class LoadBalancerService {
 
   private sortTasksByPriority(tasks: Task[]): Task[] {
     const priorityOrder = { HIGH: 3, NORMAL: 2, LOW: 1 };
-    
+
     return tasks.sort((a, b) => {
       // First sort by priority
-      const priorityDiff = (priorityOrder[b.priority] || 1) - (priorityOrder[a.priority] || 1);
+      const priorityDiff =
+        (priorityOrder[b.priority] || 1) - (priorityOrder[a.priority] || 1);
       if (priorityDiff !== 0) return priorityDiff;
-      
+
       // Then by creation time (older first)
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
@@ -296,13 +331,15 @@ export class LoadBalancerService {
 
   private calculateTasksPerSecond(metrics: LoadMetrics[]): number {
     if (metrics.length < 2) return 0;
-    
-    const timeSpan = metrics[metrics.length - 1].timestamp.getTime() - metrics[0].timestamp.getTime();
+
+    const timeSpan =
+      metrics[metrics.length - 1].timestamp.getTime() -
+      metrics[0].timestamp.getTime();
     const timeSpanSeconds = timeSpan / 1000;
-    
+
     // This is a simplified calculation - in reality you'd track actual task completions
     const estimatedTasks = metrics.reduce((sum, m) => sum + m.activeAgents, 0);
-    
+
     return timeSpanSeconds > 0 ? estimatedTasks / timeSpanSeconds : 0;
   }
 }

@@ -49,8 +49,8 @@ export class HealthService {
       services: {
         database: 'healthy',
         desktop: 'healthy',
-        aiProviders: {}
-      }
+        aiProviders: {},
+      },
     };
   }
 
@@ -69,17 +69,16 @@ export class HealthService {
         memory: {
           used: usedMem,
           total: totalMem,
-          usage: (usedMem / totalMem) * 100
+          usage: (usedMem / totalMem) * 100,
         },
         cpu: {
           usage: await this.getCpuUsage(),
-          load: os.loadavg()
-        }
+          load: os.loadavg(),
+        },
       };
 
       // Determine overall health status
       this.healthData.status = this.calculateHealthStatus();
-
     } catch (error) {
       this.logger.error('Error updating health metrics', error);
     }
@@ -115,7 +114,7 @@ export class HealthService {
     }
 
     const unhealthyServices = Object.values(services.aiProviders).filter(
-      status => status === 'unhealthy'
+      (status) => status === 'unhealthy',
     ).length;
 
     if (unhealthyServices > 0) {
@@ -129,7 +128,10 @@ export class HealthService {
     this.healthData.tasks = { ...this.healthData.tasks, ...metrics };
   }
 
-  updateServiceHealth(service: keyof SystemHealth['services'], status: 'healthy' | 'unhealthy') {
+  updateServiceHealth(
+    service: keyof SystemHealth['services'],
+    status: 'healthy' | 'unhealthy',
+  ) {
     if (service === 'aiProviders') {
       return; // Handle AI providers separately
     }

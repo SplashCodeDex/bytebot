@@ -6,6 +6,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { BytebotMcpModule } from './mcp';
+import { RovoEnhancedMcpModule } from './mcp/rovo-enhanced-mcp.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { BytebotMcpModule } from './mcp';
     ComputerUseModule,
     InputTrackingModule,
     BytebotMcpModule,
+    RovoEnhancedMcpModule,
   ],
   controllers: [AppController],
   providers: [AppService],

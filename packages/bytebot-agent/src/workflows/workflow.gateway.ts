@@ -18,7 +18,9 @@ import { WorkflowEvent } from './workflow.types';
   },
   namespace: '/workflows',
 })
-export class WorkflowGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class WorkflowGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -44,7 +46,9 @@ export class WorkflowGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (subscriptions) {
       subscriptions.add(data.workflowId);
       client.join(`workflow:${data.workflowId}`);
-      this.logger.debug(`Client ${client.id} subscribed to workflow ${data.workflowId}`);
+      this.logger.debug(
+        `Client ${client.id} subscribed to workflow ${data.workflowId}`,
+      );
     }
   }
 
@@ -57,7 +61,9 @@ export class WorkflowGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (subscriptions) {
       subscriptions.delete(data.workflowId);
       client.leave(`workflow:${data.workflowId}`);
-      this.logger.debug(`Client ${client.id} unsubscribed from workflow ${data.workflowId}`);
+      this.logger.debug(
+        `Client ${client.id} unsubscribed from workflow ${data.workflowId}`,
+      );
     }
   }
 
@@ -67,7 +73,9 @@ export class WorkflowGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
   ) {
     client.join(`execution:${data.executionId}`);
-    this.logger.debug(`Client ${client.id} subscribed to execution ${data.executionId}`);
+    this.logger.debug(
+      `Client ${client.id} subscribed to execution ${data.executionId}`,
+    );
   }
 
   @SubscribeMessage('unsubscribe_execution')
@@ -76,19 +84,29 @@ export class WorkflowGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
   ) {
     client.leave(`execution:${data.executionId}`);
-    this.logger.debug(`Client ${client.id} unsubscribed from execution ${data.executionId}`);
+    this.logger.debug(
+      `Client ${client.id} unsubscribed from execution ${data.executionId}`,
+    );
   }
 
   @OnEvent('workflow.event')
   handleWorkflowEvent(event: WorkflowEvent) {
     // Broadcast to workflow subscribers
-    this.server.to(`workflow:${event.workflowId}`).emit('workflow_event', event);
-    
+    this.server
+      .to(`workflow:${event.workflowId}`)
+      .emit('workflow_event', event);
+
     // Broadcast to execution subscribers
-    this.server.to(`execution:${event.executionId}`).emit('execution_event', event);
+    this.server
+      .to(`execution:${event.executionId}`)
+      .emit('execution_event', event);
 
     // Broadcast to all clients for global events
-    if (['workflow_started', 'workflow_completed', 'workflow_failed'].includes(event.type)) {
+    if (
+      ['workflow_started', 'workflow_completed', 'workflow_failed'].includes(
+        event.type,
+      )
+    ) {
       this.server.emit('global_workflow_event', event);
     }
   }
@@ -122,12 +140,15 @@ export class WorkflowGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   // Broadcast workflow execution progress
-  broadcastExecutionProgress(executionId: string, progress: {
-    percentage: number;
-    currentNode: string;
-    completedNodes: string[];
-    estimatedTimeRemaining?: number;
-  }) {
+  broadcastExecutionProgress(
+    executionId: string,
+    progress: {
+      percentage: number;
+      currentNode: string;
+      completedNodes: string[];
+      estimatedTimeRemaining?: number;
+    },
+  ) {
     this.server.to(`execution:${executionId}`).emit('execution_progress', {
       executionId,
       ...progress,

@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsArray, IsObject, IsNumber, IsBoolean, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsObject,
+  IsNumber,
+  IsBoolean,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class WorkflowNodeDto {
@@ -6,7 +14,14 @@ export class WorkflowNodeDto {
   id: string;
 
   @IsString()
-  type: 'TASK' | 'CONDITION' | 'LOOP' | 'PARALLEL' | 'HUMAN_APPROVAL' | 'DELAY' | 'WEBHOOK';
+  type:
+    | 'TASK'
+    | 'CONDITION'
+    | 'LOOP'
+    | 'PARALLEL'
+    | 'HUMAN_APPROVAL'
+    | 'DELAY'
+    | 'WEBHOOK';
 
   @IsString()
   name: string;

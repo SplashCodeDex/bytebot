@@ -28,7 +28,11 @@ export interface AutomationTrigger {
 }
 
 export interface AutomationAction {
-  type: 'task_creation' | 'notification' | 'workflow_trigger' | 'data_processing';
+  type:
+    | 'task_creation'
+    | 'notification'
+    | 'workflow_trigger'
+    | 'data_processing';
   config: {
     taskDescription?: string;
     notificationMessage?: string;
@@ -39,7 +43,11 @@ export interface AutomationAction {
 }
 
 export interface AutomationCondition {
-  type: 'time_range' | 'resource_availability' | 'previous_task_success' | 'user_confirmation';
+  type:
+    | 'time_range'
+    | 'resource_availability'
+    | 'previous_task_success'
+    | 'user_confirmation';
   config: {
     startTime?: string;
     endTime?: string;
@@ -50,7 +58,11 @@ export interface AutomationCondition {
 }
 
 export interface LearningInsight {
-  type: 'workflow_optimization' | 'resource_allocation' | 'timing_optimization' | 'error_prevention';
+  type:
+    | 'workflow_optimization'
+    | 'resource_allocation'
+    | 'timing_optimization'
+    | 'error_prevention';
   description: string;
   confidence: number;
   potentialImpact: 'low' | 'medium' | 'high';
@@ -75,7 +87,7 @@ export class AutomationLearningService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly taskPatternService: TaskPatternService
+    private readonly taskPatternService: TaskPatternService,
   ) {}
 
   /**
@@ -88,10 +100,9 @@ export class AutomationLearningService {
     const patterns = await this.taskPatternService.analyzeTaskPatterns();
 
     // Identify repetitive manual workflows
-    const repetitivePatterns = patterns.filter(p => 
-      p.frequency >= 5 && 
-      p.successRate > 0.8 && 
-      p.averageDuration > 60000 // 1 minute
+    const repetitivePatterns = patterns.filter(
+      (p) =>
+        p.frequency >= 5 && p.successRate > 0.8 && p.averageDuration > 60000, // 1 minute
     );
 
     for (const pattern of repetitivePatterns) {
@@ -99,13 +110,16 @@ export class AutomationLearningService {
         type: 'workflow_optimization',
         description: `Pattern "${pattern.description}" has been repeated ${pattern.frequency} times with ${Math.round(pattern.successRate * 100)}% success rate. Consider creating an automation rule.`,
         confidence: Math.min(pattern.frequency / 10, 1) * pattern.successRate,
-        potentialImpact: this.calculateImpact(pattern.frequency, pattern.averageDuration),
+        potentialImpact: this.calculateImpact(
+          pattern.frequency,
+          pattern.averageDuration,
+        ),
         suggestedAction: `Create automation rule for: ${pattern.description}`,
         basedOnData: {
           taskCount: pattern.frequency,
           timeRange: '30 days',
-          patterns: [pattern.id]
-        }
+          patterns: [pattern.id],
+        },
       });
     }
 
@@ -132,7 +146,7 @@ export class AutomationLearningService {
     pattern: TaskPattern,
     trigger: AutomationTrigger,
     actions: AutomationAction[],
-    conditions: AutomationCondition[] = []
+    conditions: AutomationCondition[] = [],
   ): Promise<AutomationRule> {
     const rule: AutomationRule = {
       id: `auto_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -145,7 +159,7 @@ export class AutomationLearningService {
       timesExecuted: 0,
       successRate: 0,
       createdAt: new Date(),
-      enabled: true
+      enabled: true,
     };
 
     this.automationRules.set(rule.id, rule);
@@ -157,7 +171,10 @@ export class AutomationLearningService {
   /**
    * Execute automation rule if conditions are met
    */
-  async executeAutomationRule(ruleId: string, context: any = {}): Promise<boolean> {
+  async executeAutomationRule(
+    ruleId: string,
+    context: any = {},
+  ): Promise<boolean> {
     const rule = this.automationRules.get(ruleId);
     if (!rule || !rule.enabled) {
       return false;
@@ -165,7 +182,10 @@ export class AutomationLearningService {
 
     try {
       // Check conditions
-      const conditionsMet = await this.checkConditions(rule.conditions, context);
+      const conditionsMet = await this.checkConditions(
+        rule.conditions,
+        context,
+      );
       if (!conditionsMet) {
         this.logger.debug(`Conditions not met for rule: ${rule.name}`);
         return false;
@@ -179,18 +199,20 @@ export class AutomationLearningService {
       // Update execution stats
       rule.timesExecuted++;
       rule.lastExecuted = new Date();
-      
+
       this.logger.log(`Successfully executed automation rule: ${rule.name}`);
       return true;
-
     } catch (error: any) {
-      this.logger.error(`Failed to execute automation rule ${rule.name}: ${error.message}`);
-      
+      this.logger.error(
+        `Failed to execute automation rule ${rule.name}: ${error.message}`,
+      );
+
       // Update success rate
       const totalExecutions = rule.timesExecuted + 1;
-      rule.successRate = (rule.successRate * rule.timesExecuted) / totalExecutions;
+      rule.successRate =
+        (rule.successRate * rule.timesExecuted) / totalExecutions;
       rule.timesExecuted = totalExecutions;
-      
+
       return false;
     }
   }
@@ -198,12 +220,16 @@ export class AutomationLearningService {
   /**
    * Learn from user interactions and improve automation
    */
-  recordUserInteraction(action: string, context: any, outcome: 'success' | 'failure' | 'cancelled'): void {
+  recordUserInteraction(
+    action: string,
+    context: any,
+    outcome: 'success' | 'failure' | 'cancelled',
+  ): void {
     this.userBehaviorHistory.push({
       timestamp: new Date(),
       action,
       context,
-      outcome
+      outcome,
     });
 
     // Keep only recent history (last 1000 interactions)
@@ -212,7 +238,8 @@ export class AutomationLearningService {
     }
 
     // Analyze for new patterns
-    if (this.userBehaviorHistory.length % 50 === 0) { // Every 50 interactions
+    if (this.userBehaviorHistory.length % 50 === 0) {
+      // Every 50 interactions
       void this.analyzeNewPatterns();
     }
   }
@@ -222,11 +249,12 @@ export class AutomationLearningService {
    */
   getAutomationStats() {
     const rules = Array.from(this.automationRules.values());
-    const activeRules = rules.filter(r => r.enabled);
+    const activeRules = rules.filter((r) => r.enabled);
     const totalExecutions = rules.reduce((sum, r) => sum + r.timesExecuted, 0);
-    const averageSuccessRate = rules.length > 0 
-      ? rules.reduce((sum, r) => sum + r.successRate, 0) / rules.length 
-      : 0;
+    const averageSuccessRate =
+      rules.length > 0
+        ? rules.reduce((sum, r) => sum + r.successRate, 0) / rules.length
+        : 0;
 
     return {
       totalRules: rules.length,
@@ -235,45 +263,58 @@ export class AutomationLearningService {
       averageSuccessRate,
       recentInteractions: this.userBehaviorHistory.length,
       topPerformingRules: rules
-        .sort((a, b) => (b.successRate * b.timesExecuted) - (a.successRate * a.timesExecuted))
+        .sort(
+          (a, b) =>
+            b.successRate * b.timesExecuted - a.successRate * a.timesExecuted,
+        )
         .slice(0, 5)
-        .map(r => ({
+        .map((r) => ({
           name: r.name,
           executions: r.timesExecuted,
-          successRate: r.successRate
-        }))
+          successRate: r.successRate,
+        })),
     };
   }
 
-  private async analyzeOptimalTiming(patterns: TaskPattern[]): Promise<LearningInsight[]> {
+  private async analyzeOptimalTiming(
+    patterns: TaskPattern[],
+  ): Promise<LearningInsight[]> {
     const insights: LearningInsight[] = [];
-    
+
     // Get task execution times from database
     const tasks = await this.prisma.task.findMany({
       where: {
         createdAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
-        }
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+        },
       },
       select: {
         createdAt: true,
         completedAt: true,
-        description: true
-      }
+        description: true,
+      },
     });
 
     // Analyze by hour of day
-    const hourlyPerformance = new Map<number, { count: number; avgDuration: number }>();
-    
+    const hourlyPerformance = new Map<
+      number,
+      { count: number; avgDuration: number }
+    >();
+
     for (const task of tasks) {
       if (!task.completedAt) continue;
-      
+
       const hour = task.createdAt.getHours();
       const duration = task.completedAt.getTime() - task.createdAt.getTime();
-      
-      const existing = hourlyPerformance.get(hour) || { count: 0, avgDuration: 0 };
+
+      const existing = hourlyPerformance.get(hour) || {
+        count: 0,
+        avgDuration: 0,
+      };
       existing.count++;
-      existing.avgDuration = (existing.avgDuration * (existing.count - 1) + duration) / existing.count;
+      existing.avgDuration =
+        (existing.avgDuration * (existing.count - 1) + duration) /
+        existing.count;
       hourlyPerformance.set(hour, existing);
     }
 
@@ -294,8 +335,8 @@ export class AutomationLearningService {
         basedOnData: {
           taskCount: tasks.length,
           timeRange: '30 days',
-          patterns: ['timing_analysis']
-        }
+          patterns: ['timing_analysis'],
+        },
       });
     }
 
@@ -309,23 +350,28 @@ export class AutomationLearningService {
     // For now, return a placeholder insight
     insights.push({
       type: 'resource_allocation',
-      description: 'Memory usage spikes detected during concurrent task execution. Consider implementing task queuing for memory-intensive operations.',
+      description:
+        'Memory usage spikes detected during concurrent task execution. Consider implementing task queuing for memory-intensive operations.',
       confidence: 0.6,
       potentialImpact: 'medium',
-      suggestedAction: 'Implement intelligent task queuing based on resource requirements',
+      suggestedAction:
+        'Implement intelligent task queuing based on resource requirements',
       basedOnData: {
         taskCount: 0,
         timeRange: '7 days',
-        patterns: ['resource_analysis']
-      }
+        patterns: ['resource_analysis'],
+      },
     });
 
     return insights;
   }
 
-  private calculateImpact(frequency: number, duration: number): 'low' | 'medium' | 'high' {
+  private calculateImpact(
+    frequency: number,
+    duration: number,
+  ): 'low' | 'medium' | 'high' {
     const timesSaved = frequency * duration * 0.8; // Assume 80% time savings from automation
-    
+
     if (timesSaved > 3600000) return 'high'; // More than 1 hour saved
     if (timesSaved > 1800000) return 'medium'; // More than 30 minutes saved
     return 'low';
@@ -333,21 +379,31 @@ export class AutomationLearningService {
 
   private getImpactScore(impact: 'low' | 'medium' | 'high'): number {
     switch (impact) {
-      case 'high': return 3;
-      case 'medium': return 2;
-      case 'low': return 1;
+      case 'high':
+        return 3;
+      case 'medium':
+        return 2;
+      case 'low':
+        return 1;
     }
   }
 
-  private async checkConditions(conditions: AutomationCondition[], context: any): Promise<boolean> {
+  private async checkConditions(
+    conditions: AutomationCondition[],
+    context: any,
+  ): Promise<boolean> {
     for (const condition of conditions) {
       switch (condition.type) {
         case 'time_range':
           const now = new Date();
           const currentHour = now.getHours();
-          const startHour = condition.config.startTime ? parseInt(condition.config.startTime) : 0;
-          const endHour = condition.config.endTime ? parseInt(condition.config.endTime) : 23;
-          
+          const startHour = condition.config.startTime
+            ? parseInt(condition.config.startTime)
+            : 0;
+          const endHour = condition.config.endTime
+            ? parseInt(condition.config.endTime)
+            : 23;
+
           if (currentHour < startHour || currentHour > endHour) {
             return false;
           }
@@ -356,14 +412,17 @@ export class AutomationLearningService {
         case 'resource_availability':
           const memoryUsage = process.memoryUsage().heapUsed;
           const minMemory = condition.config.minMemory || 0;
-          
+
           if (memoryUsage > minMemory) {
             return false;
           }
           break;
 
         case 'user_confirmation':
-          if (condition.config.requireUserConfirmation && !context.userConfirmed) {
+          if (
+            condition.config.requireUserConfirmation &&
+            !context.userConfirmed
+          ) {
             return false;
           }
           break;
@@ -373,19 +432,26 @@ export class AutomationLearningService {
     return true;
   }
 
-  private async executeAction(action: AutomationAction, context: any): Promise<void> {
+  private async executeAction(
+    action: AutomationAction,
+    context: any,
+  ): Promise<void> {
     switch (action.type) {
       case 'task_creation':
         if (action.config.taskDescription) {
           // Create a new task
-          this.logger.log(`Creating automated task: ${action.config.taskDescription}`);
+          this.logger.log(
+            `Creating automated task: ${action.config.taskDescription}`,
+          );
           // Implementation would call TasksService.create()
         }
         break;
 
       case 'notification':
         if (action.config.notificationMessage) {
-          this.logger.log(`Sending notification: ${action.config.notificationMessage}`);
+          this.logger.log(
+            `Sending notification: ${action.config.notificationMessage}`,
+          );
           // Implementation would send notification through appropriate channel
         }
         break;
@@ -402,25 +468,30 @@ export class AutomationLearningService {
   private async analyzeNewPatterns(): Promise<void> {
     // Analyze recent user interactions for new automation opportunities
     const recentInteractions = this.userBehaviorHistory.slice(-100);
-    
+
     // Group similar actions
     const actionGroups = new Map<string, number>();
     for (const interaction of recentInteractions) {
-      actionGroups.set(interaction.action, (actionGroups.get(interaction.action) || 0) + 1);
+      actionGroups.set(
+        interaction.action,
+        (actionGroups.get(interaction.action) || 0) + 1,
+      );
     }
 
     // Identify frequently repeated actions
     for (const [action, count] of actionGroups) {
       if (count >= 5 && !this.hasExistingRuleForAction(action)) {
-        this.logger.log(`Detected potential automation opportunity: ${action} (${count} times)`);
+        this.logger.log(
+          `Detected potential automation opportunity: ${action} (${count} times)`,
+        );
         // Could create suggestion for user review
       }
     }
   }
 
   private hasExistingRuleForAction(action: string): boolean {
-    return Array.from(this.automationRules.values()).some(rule => 
-      rule.description.toLowerCase().includes(action.toLowerCase())
+    return Array.from(this.automationRules.values()).some((rule) =>
+      rule.description.toLowerCase().includes(action.toLowerCase()),
     );
   }
 }

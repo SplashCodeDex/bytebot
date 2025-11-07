@@ -51,21 +51,36 @@ export class ToolUsageAnalyzerService {
       }
     }
 
-    return insights.sort((a, b) => b.confidence * this.getImpactScore(b.impact) - a.confidence * this.getImpactScore(a.impact));
+    return insights.sort(
+      (a, b) =>
+        b.confidence * this.getImpactScore(b.impact) -
+        a.confidence * this.getImpactScore(a.impact),
+    );
   }
 
   /**
    * Identify common tool workflow patterns
    */
   async identifyWorkflowPatterns(): Promise<ToolWorkflowPattern[]> {
-    const patterns: Map<string, { count: number; successes: number; durations: number[] }> = new Map();
+    const patterns: Map<
+      string,
+      { count: number; successes: number; durations: number[] }
+    > = new Map();
 
     // Analyze sequences of 2-4 tools
     for (const sequence of this.toolSequences) {
       if (sequence.sequence.length < 2) continue;
 
-      for (let length = 2; length <= Math.min(4, sequence.sequence.length); length++) {
-        for (let start = 0; start <= sequence.sequence.length - length; start++) {
+      for (
+        let length = 2;
+        length <= Math.min(4, sequence.sequence.length);
+        length++
+      ) {
+        for (
+          let start = 0;
+          start <= sequence.sequence.length - length;
+          start++
+        ) {
           const pattern = sequence.sequence.slice(start, start + length);
           const patternKey = pattern.join(' → ');
 
@@ -83,34 +98,45 @@ export class ToolUsageAnalyzerService {
 
     // Convert to workflow patterns
     const workflowPatterns: ToolWorkflowPattern[] = [];
-    
+
     for (const [patternKey, stats] of patterns) {
-      if (stats.count >= 3) { // Minimum frequency threshold
+      if (stats.count >= 3) {
+        // Minimum frequency threshold
         const successRate = stats.successes / stats.count;
-        const optimization = this.generatePatternOptimization(patternKey.split(' → '), stats);
+        const optimization = this.generatePatternOptimization(
+          patternKey.split(' → '),
+          stats,
+        );
 
         workflowPatterns.push({
           pattern: patternKey.split(' → '),
           frequency: stats.count,
           successRate,
-          optimization
+          optimization,
         });
       }
     }
 
-    return workflowPatterns.sort((a, b) => b.frequency * b.successRate - a.frequency * a.successRate);
+    return workflowPatterns.sort(
+      (a, b) => b.frequency * b.successRate - a.frequency * a.successRate,
+    );
   }
 
   /**
    * Record tool sequence for analysis
    */
-  recordToolSequence(taskId: string, tools: string[], success: boolean, duration: number): void {
+  recordToolSequence(
+    taskId: string,
+    tools: string[],
+    success: boolean,
+    duration: number,
+  ): void {
     this.toolSequences.push({
       taskId,
       sequence: tools,
       success,
       duration,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
 
     // Keep only recent sequences (last 1000)
@@ -118,7 +144,9 @@ export class ToolUsageAnalyzerService {
       this.toolSequences = this.toolSequences.slice(-1000);
     }
 
-    this.logger.debug(`Recorded tool sequence for task ${taskId}: ${tools.join(' → ')}`);
+    this.logger.debug(
+      `Recorded tool sequence for task ${taskId}: ${tools.join(' → ')}`,
+    );
   }
 
   /**
@@ -127,20 +155,24 @@ export class ToolUsageAnalyzerService {
   async getToolUsageRecommendations(): Promise<string[]> {
     const insights = await this.analyzeToolUsagePatterns();
     const workflowPatterns = await this.identifyWorkflowPatterns();
-    
+
     const recommendations: string[] = [];
 
     // Recommendations from insights
-    const highImpactInsights = insights.filter(i => i.impact === 'high' && i.confidence > 0.7);
+    const highImpactInsights = insights.filter(
+      (i) => i.impact === 'high' && i.confidence > 0.7,
+    );
     for (const insight of highImpactInsights) {
       recommendations.push(insight.recommendation);
     }
 
     // Recommendations from workflow patterns
-    const efficientPatterns = workflowPatterns.filter(p => p.successRate > 0.8 && p.frequency >= 5);
+    const efficientPatterns = workflowPatterns.filter(
+      (p) => p.successRate > 0.8 && p.frequency >= 5,
+    );
     for (const pattern of efficientPatterns.slice(0, 3)) {
       recommendations.push(
-        `Consider automating the workflow: ${pattern.pattern.join(' → ')} (${Math.round(pattern.successRate * 100)}% success rate, used ${pattern.frequency} times)`
+        `Consider automating the workflow: ${pattern.pattern.join(' → ')} (${Math.round(pattern.successRate * 100)}% success rate, used ${pattern.frequency} times)`,
       );
     }
 
@@ -152,7 +184,7 @@ export class ToolUsageAnalyzerService {
 
     if (underusedTools.length > 0) {
       recommendations.push(
-        `Consider exploring these underutilized but effective tools: ${underusedTools.slice(0, 3).join(', ')}`
+        `Consider exploring these underutilized but effective tools: ${underusedTools.slice(0, 3).join(', ')}`,
       );
     }
 
@@ -168,23 +200,26 @@ export class ToolUsageAnalyzerService {
 
     return {
       toolStatistics: Object.fromEntries(toolStats),
-      recentWorkflows: recentSequences.map(seq => ({
+      recentWorkflows: recentSequences.map((seq) => ({
         pattern: seq.sequence.join(' → '),
         success: seq.success,
         duration: seq.duration,
-        timestamp: seq.timestamp
+        timestamp: seq.timestamp,
       })),
       exportTimestamp: new Date(),
-      totalSequencesAnalyzed: this.toolSequences.length
+      totalSequencesAnalyzed: this.toolSequences.length,
     };
   }
 
-  private calculateToolStatistics(): Map<string, {
-    frequency: number;
-    successRate: number;
-    averageDuration: number;
-    lastUsed: Date;
-  }> {
+  private calculateToolStatistics(): Map<
+    string,
+    {
+      frequency: number;
+      successRate: number;
+      averageDuration: number;
+      lastUsed: Date;
+    }
+  > {
     const toolStats = new Map();
 
     for (const sequence of this.toolSequences) {
@@ -194,7 +229,7 @@ export class ToolUsageAnalyzerService {
             frequency: 0,
             successes: 0,
             durations: [],
-            lastUsed: sequence.timestamp
+            lastUsed: sequence.timestamp,
           });
         }
 
@@ -214,15 +249,20 @@ export class ToolUsageAnalyzerService {
       finalStats.set(tool, {
         frequency: stats.frequency,
         successRate: stats.successes / stats.frequency,
-        averageDuration: stats.durations.reduce((sum: number, d: number) => sum + d, 0) / stats.durations.length,
-        lastUsed: stats.lastUsed
+        averageDuration:
+          stats.durations.reduce((sum: number, d: number) => sum + d, 0) /
+          stats.durations.length,
+        lastUsed: stats.lastUsed,
       });
     }
 
     return finalStats;
   }
 
-  private async generateToolInsight(toolName: string, stats: any): Promise<ToolUsageInsight | null> {
+  private async generateToolInsight(
+    toolName: string,
+    stats: any,
+  ): Promise<ToolUsageInsight | null> {
     if (stats.frequency < 3) return null; // Need minimum usage for insights
 
     let insight = '';
@@ -245,7 +285,8 @@ export class ToolUsageAnalyzerService {
 
     // Duration analysis
     const avgDuration = stats.averageDuration;
-    if (avgDuration > 60000) { // 1 minute
+    if (avgDuration > 60000) {
+      // 1 minute
       insight += insight ? ' and ' : '';
       insight += `takes longer than expected (avg ${Math.round(avgDuration / 1000)}s)`;
       recommendation = `Optimize ${toolName} performance or consider faster alternatives`;
@@ -254,7 +295,8 @@ export class ToolUsageAnalyzerService {
     }
 
     // Usage frequency analysis
-    const daysSinceLastUse = (Date.now() - stats.lastUsed.getTime()) / (1000 * 60 * 60 * 24);
+    const daysSinceLastUse =
+      (Date.now() - stats.lastUsed.getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceLastUse > 14 && stats.successRate > 0.8) {
       insight = `${toolName} was effective but hasn't been used recently`;
       recommendation = `Consider reintegrating ${toolName} into current workflows`;
@@ -276,24 +318,25 @@ export class ToolUsageAnalyzerService {
         usageCount: stats.frequency,
         successRate: stats.successRate,
         averageDuration: stats.averageDuration,
-        trends
-      }
+        trends,
+      },
     };
   }
 
   private calculateToolTrends(toolName: string): string[] {
     const trends: string[] = [];
-    
+
     // Simple trend analysis over time
     const recentUsage = this.toolSequences
-      .filter(seq => seq.sequence.includes(toolName))
+      .filter((seq) => seq.sequence.includes(toolName))
       .slice(-20);
 
     if (recentUsage.length < 5) return trends;
 
-    const recentSuccessRate = recentUsage.filter(seq => seq.success).length / recentUsage.length;
+    const recentSuccessRate =
+      recentUsage.filter((seq) => seq.success).length / recentUsage.length;
     const overallStats = this.calculateToolStatistics().get(toolName);
-    
+
     if (recentSuccessRate > overallStats?.successRate * 1.1) {
       trends.push('improving_success_rate');
     } else if (recentSuccessRate < overallStats?.successRate * 0.9) {
@@ -316,13 +359,16 @@ export class ToolUsageAnalyzerService {
     }
 
     const successRate = stats.successes / stats.count;
-    const avgDuration = stats.durations.reduce((sum: number, d: number) => sum + d, 0) / stats.durations.length;
+    const avgDuration =
+      stats.durations.reduce((sum: number, d: number) => sum + d, 0) /
+      stats.durations.length;
 
     if (successRate < 0.7) {
       return `Low success rate (${Math.round(successRate * 100)}%) - consider alternative tool sequence`;
     }
 
-    if (avgDuration > 120000) { // 2 minutes
+    if (avgDuration > 120000) {
+      // 2 minutes
       return `Long duration (${Math.round(avgDuration / 1000)}s) - look for shortcuts or tool optimizations`;
     }
 
@@ -335,9 +381,12 @@ export class ToolUsageAnalyzerService {
 
   private getImpactScore(impact: 'high' | 'medium' | 'low'): number {
     switch (impact) {
-      case 'high': return 3;
-      case 'medium': return 2;
-      case 'low': return 1;
+      case 'high':
+        return 3;
+      case 'medium':
+        return 2;
+      case 'low':
+        return 1;
     }
   }
 }

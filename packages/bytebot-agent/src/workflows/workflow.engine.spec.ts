@@ -73,9 +73,17 @@ describe('WorkflowEngine', () => {
             dependencies: [],
             config: {
               prompt: 'Test task',
-              model: { provider: 'anthropic', name: 'claude-3-sonnet-20240229' },
+              model: {
+                provider: 'anthropic',
+                name: 'claude-3-sonnet-20240229',
+              },
             },
-            retryPolicy: { maxRetries: 3, baseDelay: 1000, backoffStrategy: 'exponential', maxDelay: 10000 },
+            retryPolicy: {
+              maxRetries: 3,
+              baseDelay: 1000,
+              backoffStrategy: 'exponential',
+              maxDelay: 10000,
+            },
             errorAction: { action: 'fail' },
           },
         ],
@@ -99,7 +107,11 @@ describe('WorkflowEngine', () => {
       prisma.workflowExecution.findFirst.mockResolvedValue(null);
       prisma.workflowExecution.create.mockResolvedValue(mockExecution as any);
 
-      const result = await service.executeWorkflow('workflow-1', {}, 'test-user');
+      const result = await service.executeWorkflow(
+        'workflow-1',
+        {},
+        'test-user',
+      );
 
       expect(result).toBe('execution-1');
       expect(prisma.workflow.findUnique).toHaveBeenCalledWith({
@@ -113,18 +125,22 @@ describe('WorkflowEngine', () => {
           variables: true,
         },
       });
-      expect(eventEmitter.emit).toHaveBeenCalledWith('workflow.event', expect.objectContaining({
-        type: 'workflow_started',
-        workflowId: 'workflow-1',
-        executionId: 'execution-1',
-      }));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'workflow.event',
+        expect.objectContaining({
+          type: 'workflow_started',
+          workflowId: 'workflow-1',
+          executionId: 'execution-1',
+        }),
+      );
     });
 
     it('should throw error if workflow not found', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.executeWorkflow('non-existent', {}, 'test-user'))
-        .rejects.toThrow('Workflow non-existent not found');
+      await expect(
+        service.executeWorkflow('non-existent', {}, 'test-user'),
+      ).rejects.toThrow('Workflow non-existent not found');
     });
 
     it('should throw error if workflow is not active', async () => {
@@ -137,8 +153,9 @@ describe('WorkflowEngine', () => {
 
       prisma.workflow.findUnique.mockResolvedValue(mockWorkflow as any);
 
-      await expect(service.executeWorkflow('workflow-1', {}, 'test-user'))
-        .rejects.toThrow('Workflow workflow-1 is not active');
+      await expect(
+        service.executeWorkflow('workflow-1', {}, 'test-user'),
+      ).rejects.toThrow('Workflow workflow-1 is not active');
     });
 
     it('should prevent concurrent execution when not allowed', async () => {
@@ -156,34 +173,49 @@ describe('WorkflowEngine', () => {
       };
 
       prisma.workflow.findUnique.mockResolvedValue(mockWorkflow as any);
-      prisma.workflowExecution.findFirst.mockResolvedValue(mockActiveExecution as any);
+      prisma.workflowExecution.findFirst.mockResolvedValue(
+        mockActiveExecution as any,
+      );
 
-      await expect(service.executeWorkflow('workflow-1', {}, 'test-user'))
-        .rejects.toThrow('Workflow workflow-1 is already running');
+      await expect(
+        service.executeWorkflow('workflow-1', {}, 'test-user'),
+      ).rejects.toThrow('Workflow workflow-1 is already running');
     });
   });
 
   describe('condition evaluation', () => {
     it('should correctly evaluate simple conditions', () => {
       const variables = { count: 5, name: 'test' };
-      
+
       // Test equals
-      const result1 = service['evaluateCondition']({ field: 'count', operator: 'equals', value: 5 }, variables);
+      const result1 = service['evaluateCondition'](
+        { field: 'count', operator: 'equals', value: 5 },
+        variables,
+      );
       expect(result1).toBe(true);
 
       // Test greater_than
-      const result2 = service['evaluateCondition']({ field: 'count', operator: 'greater_than', value: 3 }, variables);
+      const result2 = service['evaluateCondition'](
+        { field: 'count', operator: 'greater_than', value: 3 },
+        variables,
+      );
       expect(result2).toBe(true);
 
       // Test contains
-      const result3 = service['evaluateCondition']({ field: 'name', operator: 'contains', value: 'es' }, variables);
+      const result3 = service['evaluateCondition'](
+        { field: 'name', operator: 'contains', value: 'es' },
+        variables,
+      );
       expect(result3).toBe(true);
     });
 
     it('should handle nested field access', () => {
       const variables = { user: { profile: { age: 25 } } };
-      
-      const result = service['evaluateCondition']({ field: 'user.profile.age', operator: 'greater_than', value: 18 }, variables);
+
+      const result = service['evaluateCondition'](
+        { field: 'user.profile.age', operator: 'greater_than', value: 18 },
+        variables,
+      );
       expect(result).toBe(true);
     });
   });
@@ -192,7 +224,7 @@ describe('WorkflowEngine', () => {
     it('should interpolate variables in templates', () => {
       const variables = { name: 'John', age: 30 };
       const template = 'Hello {{name}}, you are {{age}} years old';
-      
+
       const result = service['interpolateVariables'](template, variables);
       expect(result).toBe('Hello John, you are 30 years old');
     });
@@ -200,7 +232,7 @@ describe('WorkflowEngine', () => {
     it('should leave unknown variables unchanged', () => {
       const variables = { name: 'John' };
       const template = 'Hello {{name}}, you are {{age}} years old';
-      
+
       const result = service['interpolateVariables'](template, variables);
       expect(result).toBe('Hello John, you are {{age}} years old');
     });

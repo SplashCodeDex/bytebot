@@ -52,7 +52,14 @@ export class GoogleService implements BytebotAgentService {
     useTools: boolean = true,
     signal?: AbortSignal,
   ): Promise<BytebotAgentResponse> {
-    return this.generateMessageWithRetry(systemPrompt, messages, model, useTools, signal, 0);
+    return this.generateMessageWithRetry(
+      systemPrompt,
+      messages,
+      model,
+      useTools,
+      signal,
+      0,
+    );
   }
 
   private async generateMessageWithRetry(
@@ -65,7 +72,7 @@ export class GoogleService implements BytebotAgentService {
   ): Promise<BytebotAgentResponse> {
     const maxRetries = 3;
     const baseDelay = 1000; // 1 second
-    
+
     try {
       const maxTokens = 8192;
 
@@ -123,18 +130,29 @@ export class GoogleService implements BytebotAgentService {
       }
 
       // Handle quota exceeded errors with exponential backoff
-      if (error.message?.includes('quota') || error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      if (
+        error.message?.includes('quota') ||
+        error.message?.includes('429') ||
+        error.message?.includes('RESOURCE_EXHAUSTED')
+      ) {
         if (retryCount < maxRetries) {
           const delay = baseDelay * Math.pow(2, retryCount);
           this.logger.warn(
-            `Quota exceeded for Google Gemini (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`
+            `Quota exceeded for Google Gemini (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`,
           );
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.generateMessageWithRetry(systemPrompt, messages, model, useTools, signal, retryCount + 1);
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return this.generateMessageWithRetry(
+            systemPrompt,
+            messages,
+            model,
+            useTools,
+            signal,
+            retryCount + 1,
+          );
         } else {
           this.logger.error(
-            `Quota exceeded for Google Gemini after ${maxRetries} retries. Please check your billing or wait for quota reset.`
+            `Quota exceeded for Google Gemini after ${maxRetries} retries. Please check your billing or wait for quota reset.`,
           );
           // Create a specialized quota error that can be handled upstream
           const quotaError = new Error('QUOTA_EXCEEDED');
@@ -146,15 +164,25 @@ export class GoogleService implements BytebotAgentService {
       }
 
       // Handle rate limiting errors
-      if (error.message?.includes('rate limit') || error.message?.includes('Too Many Requests')) {
+      if (
+        error.message?.includes('rate limit') ||
+        error.message?.includes('Too Many Requests')
+      ) {
         if (retryCount < maxRetries) {
           const delay = baseDelay * Math.pow(2, retryCount);
           this.logger.warn(
-            `Rate limit hit for Google Gemini (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`
+            `Rate limit hit for Google Gemini (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`,
           );
-          
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.generateMessageWithRetry(systemPrompt, messages, model, useTools, signal, retryCount + 1);
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return this.generateMessageWithRetry(
+            systemPrompt,
+            messages,
+            model,
+            useTools,
+            signal,
+            retryCount + 1,
+          );
         }
       }
 

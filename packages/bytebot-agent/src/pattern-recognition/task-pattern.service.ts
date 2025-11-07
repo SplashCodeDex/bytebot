@@ -41,17 +41,17 @@ export class TaskPatternService {
       where: {
         status: TaskStatus.COMPLETED,
         completedAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
-        }
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+        },
       },
       include: {
-        messages: true
-      }
+        messages: true,
+      },
     });
 
     // Group tasks by similar descriptions
     const taskGroups = this.groupSimilarTasks(tasks);
-    
+
     // Analyze each group for patterns
     const patterns: TaskPattern[] = [];
     for (const [patternId, groupTasks] of taskGroups) {
@@ -79,37 +79,49 @@ export class TaskPatternService {
           title: `Automate "${pattern.description}"`,
           description: `This task has been completed ${pattern.frequency} times with ${Math.round(pattern.successRate * 100)}% success rate. Consider creating an automated workflow.`,
           confidence: Math.min(pattern.frequency / 10, 1) * pattern.successRate,
-          estimatedTimeSavings: pattern.averageDuration * pattern.frequency * 0.8,
-          basedOnTasks: [pattern.id]
+          estimatedTimeSavings:
+            pattern.averageDuration * pattern.frequency * 0.8,
+          basedOnTasks: [pattern.id],
         });
       }
 
       // Suggest optimizations for slow tasks
-      if (pattern.averageDuration > 300000 && pattern.successRate < 0.7) { // 5 minutes
+      if (pattern.averageDuration > 300000 && pattern.successRate < 0.7) {
+        // 5 minutes
         suggestions.push({
           type: 'optimization',
           title: `Optimize "${pattern.description}"`,
           description: `This task takes an average of ${Math.round(pattern.averageDuration / 60000)} minutes with ${Math.round(pattern.successRate * 100)}% success rate. Common issues: ${pattern.failureReasons.slice(0, 2).join(', ')}.`,
-          confidence: (1 - pattern.successRate) * Math.min(pattern.frequency / 5, 1),
+          confidence:
+            (1 - pattern.successRate) * Math.min(pattern.frequency / 5, 1),
           estimatedTimeSavings: pattern.averageDuration * 0.3,
-          basedOnTasks: [pattern.id]
+          basedOnTasks: [pattern.id],
         });
       }
     }
 
     // Sort by confidence and potential impact
-    return suggestions.sort((a, b) => 
-      (b.confidence * b.estimatedTimeSavings) - (a.confidence * a.estimatedTimeSavings)
-    ).slice(0, 10);
+    return suggestions
+      .sort(
+        (a, b) =>
+          b.confidence * b.estimatedTimeSavings -
+          a.confidence * a.estimatedTimeSavings,
+      )
+      .slice(0, 10);
   }
 
   /**
    * Record task completion for pattern learning
    */
-  async recordTaskCompletion(taskId: string, duration: number, success: boolean, errorReason?: string): Promise<void> {
+  async recordTaskCompletion(
+    taskId: string,
+    duration: number,
+    success: boolean,
+    errorReason?: string,
+  ): Promise<void> {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
-      include: { messages: true }
+      include: { messages: true },
     });
 
     if (!task) return;
@@ -121,7 +133,9 @@ export class TaskPatternService {
       // Update existing pattern
       pattern.frequency++;
       pattern.averageDuration = (pattern.averageDuration + duration) / 2;
-      pattern.successRate = (pattern.successRate * (pattern.frequency - 1) + (success ? 1 : 0)) / pattern.frequency;
+      pattern.successRate =
+        (pattern.successRate * (pattern.frequency - 1) + (success ? 1 : 0)) /
+        pattern.frequency;
       pattern.lastSeen = new Date();
 
       if (!success && errorReason) {
@@ -138,17 +152,19 @@ export class TaskPatternService {
         failureReasons: !success && errorReason ? [errorReason] : [],
         suggestedOptimizations: [],
         frequency: 1,
-        lastSeen: new Date()
+        lastSeen: new Date(),
       });
     }
   }
 
-  private groupSimilarTasks(tasks: (Task & { messages: Message[] })[]): Map<string, (Task & { messages: Message[] })[]> {
+  private groupSimilarTasks(
+    tasks: (Task & { messages: Message[] })[],
+  ): Map<string, (Task & { messages: Message[] })[]> {
     const groups = new Map<string, (Task & { messages: Message[] })[]>();
 
     for (const task of tasks) {
       const patternId = this.generatePatternId(task.description);
-      
+
       if (!groups.has(patternId)) {
         groups.set(patternId, []);
       }
@@ -165,23 +181,35 @@ export class TaskPatternService {
       .replace(/\d+/g, 'NUMBER') // Replace numbers with placeholder
       .replace(/[^\w\s]/g, '') // Remove special characters
       .split(' ')
-      .filter(word => word.length > 2) // Remove short words
+      .filter((word) => word.length > 2) // Remove short words
       .sort()
       .join('_');
 
     return normalized || 'generic_task';
   }
 
-  private async analyzeTaskGroup(patternId: string, tasks: (Task & { messages: Message[] })[]): Promise<TaskPattern> {
-    const durations = tasks.map(task => {
-      if (task.completedAt && task.createdAt) {
-        return task.completedAt.getTime() - task.createdAt.getTime();
-      }
-      return 0;
-    }).filter(d => d > 0);
+  private async analyzeTaskGroup(
+    patternId: string,
+    tasks: (Task & { messages: Message[] })[],
+  ): Promise<TaskPattern> {
+    const durations = tasks
+      .map((task) => {
+        if (task.completedAt && task.createdAt) {
+          return task.completedAt.getTime() - task.createdAt.getTime();
+        }
+        return 0;
+      })
+      .filter((d) => d > 0);
 
-    const averageDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
-    const successRate = tasks.length > 0 ? tasks.filter(t => t.status === TaskStatus.COMPLETED).length / tasks.length : 0;
+    const averageDuration =
+      durations.length > 0
+        ? durations.reduce((a, b) => a + b, 0) / durations.length
+        : 0;
+    const successRate =
+      tasks.length > 0
+        ? tasks.filter((t) => t.status === TaskStatus.COMPLETED).length /
+          tasks.length
+        : 0;
 
     // Extract common actions from messages
     const allActions: string[] = [];
@@ -205,16 +233,18 @@ export class TaskPatternService {
       commonActions,
       averageDuration,
       successRate,
-      failureReasons: this.extractFailureReasons(tasks.filter(t => t.status === 'FAILED')),
+      failureReasons: this.extractFailureReasons(
+        tasks.filter((t) => t.status === 'FAILED'),
+      ),
       suggestedOptimizations: [],
       frequency: tasks.length,
-      lastSeen: new Date(Math.max(...tasks.map(t => t.createdAt.getTime())))
+      lastSeen: new Date(Math.max(...tasks.map((t) => t.createdAt.getTime()))),
     };
   }
 
   private extractCommonActions(messages: Message[]): string[] {
     const actions: string[] = [];
-    
+
     for (const message of messages) {
       if (Array.isArray(message.content)) {
         for (const block of message.content as any[]) {
@@ -230,27 +260,33 @@ export class TaskPatternService {
 
   private extractFailureReasons(failedTasks: any[]): string[] {
     const reasons = new Set<string>();
-    
+
     for (const task of failedTasks) {
       // Extract error messages from task messages
       if (task.messages) {
         for (const message of task.messages) {
           if (message.role === 'assistant' && message.content) {
             // Look for error indicators in assistant messages
-            const content = typeof message.content === 'string' ? message.content : 
-              Array.isArray(message.content) ? message.content.map(c => c.text || '').join(' ') : '';
-            
-            if (content.toLowerCase().includes('error') || 
-                content.toLowerCase().includes('failed') ||
-                content.toLowerCase().includes('unable')) {
+            const content =
+              typeof message.content === 'string'
+                ? message.content
+                : Array.isArray(message.content)
+                  ? message.content.map((c) => c.text || '').join(' ')
+                  : '';
+
+            if (
+              content.toLowerCase().includes('error') ||
+              content.toLowerCase().includes('failed') ||
+              content.toLowerCase().includes('unable')
+            ) {
               // Extract common failure patterns
               const errorPatterns = [
                 /error[:\s]+([^.!?]+)/i,
                 /failed[:\s]+([^.!?]+)/i,
                 /unable[:\s]+([^.!?]+)/i,
-                /cannot[:\s]+([^.!?]+)/i
+                /cannot[:\s]+([^.!?]+)/i,
               ];
-              
+
               for (const pattern of errorPatterns) {
                 const match = content.match(pattern);
                 if (match && match[1]) {
@@ -261,13 +297,13 @@ export class TaskPatternService {
           }
         }
       }
-      
+
       // Also check task error field if it exists
       if (task.error) {
         reasons.add(task.error);
       }
     }
-    
+
     return Array.from(reasons).slice(0, 10); // Limit to top 10 reasons
   }
 
@@ -276,13 +312,18 @@ export class TaskPatternService {
    */
   getPatternStats() {
     const patterns = Array.from(this.patterns.values());
-    
+
     return {
       totalPatterns: patterns.length,
-      mostFrequent: patterns.sort((a, b) => b.frequency - a.frequency).slice(0, 5),
-      highestSuccessRate: patterns.sort((a, b) => b.successRate - a.successRate).slice(0, 5),
-      averageSuccessRate: patterns.reduce((sum, p) => sum + p.successRate, 0) / patterns.length,
-      totalTasksAnalyzed: patterns.reduce((sum, p) => sum + p.frequency, 0)
+      mostFrequent: patterns
+        .sort((a, b) => b.frequency - a.frequency)
+        .slice(0, 5),
+      highestSuccessRate: patterns
+        .sort((a, b) => b.successRate - a.successRate)
+        .slice(0, 5),
+      averageSuccessRate:
+        patterns.reduce((sum, p) => sum + p.successRate, 0) / patterns.length,
+      totalTasksAnalyzed: patterns.reduce((sum, p) => sum + p.frequency, 0),
     };
   }
 }

@@ -18,25 +18,28 @@ export interface CircuitBreakerOptions {
 export enum CircuitBreakerState {
   CLOSED = 'CLOSED',
   OPEN = 'OPEN',
-  HALF_OPEN = 'HALF_OPEN'
+  HALF_OPEN = 'HALF_OPEN',
 }
 
 @Injectable()
 export class EnhancedRetryService {
   private readonly logger = new Logger(EnhancedRetryService.name);
-  private circuitBreakers = new Map<string, {
-    state: CircuitBreakerState;
-    failureCount: number;
-    lastFailureTime: number;
-    options: CircuitBreakerOptions;
-  }>();
+  private circuitBreakers = new Map<
+    string,
+    {
+      state: CircuitBreakerState;
+      failureCount: number;
+      lastFailureTime: number;
+      options: CircuitBreakerOptions;
+    }
+  >();
 
   /**
    * Execute a function with retry logic and exponential backoff
    */
   async withRetry<T>(
     fn: () => Promise<T>,
-    options: Partial<RetryOptions> = {}
+    options: Partial<RetryOptions> = {},
   ): Promise<T> {
     const config: RetryOptions = {
       maxAttempts: 3,
@@ -44,7 +47,7 @@ export class EnhancedRetryService {
       maxDelay: 30000,
       exponentialBackoff: true,
       jitter: true,
-      ...options
+      ...options,
     };
 
     let lastError: Error;
@@ -54,19 +57,19 @@ export class EnhancedRetryService {
         return await fn();
       } catch (error: any) {
         lastError = error;
-        
+
         if (attempt === config.maxAttempts) {
           throw error;
         }
 
         const delay = this.calculateDelay(attempt, config);
-        
+
         if (config.onRetry) {
           config.onRetry(attempt, error);
         }
 
         this.logger.warn(
-          `Attempt ${attempt}/${config.maxAttempts} failed: ${error.message}. Retrying in ${delay}ms`
+          `Attempt ${attempt}/${config.maxAttempts} failed: ${error.message}. Retrying in ${delay}ms`,
         );
 
         await this.sleep(delay);
@@ -82,13 +85,13 @@ export class EnhancedRetryService {
   async withCircuitBreaker<T>(
     fn: () => Promise<T>,
     circuitName: string,
-    options: Partial<CircuitBreakerOptions> = {}
+    options: Partial<CircuitBreakerOptions> = {},
   ): Promise<T> {
     const config: CircuitBreakerOptions = {
       failureThreshold: 5,
       timeout: 60000,
       resetTimeout: 300000,
-      ...options
+      ...options,
     };
 
     const circuit = this.getOrCreateCircuit(circuitName, config);
@@ -97,18 +100,22 @@ export class EnhancedRetryService {
     if (circuit.state === CircuitBreakerState.OPEN) {
       const timeSinceLastFailure = Date.now() - circuit.lastFailureTime;
       if (timeSinceLastFailure < config.resetTimeout) {
-        throw new Error(`Circuit breaker '${circuitName}' is OPEN. Next attempt allowed in ${Math.ceil((config.resetTimeout - timeSinceLastFailure) / 1000)}s`);
+        throw new Error(
+          `Circuit breaker '${circuitName}' is OPEN. Next attempt allowed in ${Math.ceil((config.resetTimeout - timeSinceLastFailure) / 1000)}s`,
+        );
       } else {
         // Transition to HALF_OPEN
         circuit.state = CircuitBreakerState.HALF_OPEN;
-        this.logger.info(`Circuit breaker '${circuitName}' transitioning to HALF_OPEN`);
+        this.logger.info(
+          `Circuit breaker '${circuitName}' transitioning to HALF_OPEN`,
+        );
       }
     }
 
     try {
       const result = await Promise.race([
         fn(),
-        this.createTimeoutPromise(config.timeout, circuitName)
+        this.createTimeoutPromise(config.timeout, circuitName),
       ]);
 
       // Success - reset failure count
@@ -126,7 +133,9 @@ export class EnhancedRetryService {
 
       if (circuit.failureCount >= config.failureThreshold) {
         circuit.state = CircuitBreakerState.OPEN;
-        this.logger.warn(`Circuit breaker '${circuitName}' opened due to ${circuit.failureCount} failures`);
+        this.logger.warn(
+          `Circuit breaker '${circuitName}' opened due to ${circuit.failureCount} failures`,
+        );
       }
 
       throw error;
@@ -140,12 +149,12 @@ export class EnhancedRetryService {
     fn: () => Promise<T>,
     circuitName: string,
     retryOptions: Partial<RetryOptions> = {},
-    circuitOptions: Partial<CircuitBreakerOptions> = {}
+    circuitOptions: Partial<CircuitBreakerOptions> = {},
   ): Promise<T> {
     return this.withCircuitBreaker(
       () => this.withRetry(fn, retryOptions),
       circuitName,
-      circuitOptions
+      circuitOptions,
     );
   }
 
@@ -153,7 +162,10 @@ export class EnhancedRetryService {
     let delay = options.baseDelay;
 
     if (options.exponentialBackoff) {
-      delay = Math.min(options.baseDelay * Math.pow(2, attempt - 1), options.maxDelay);
+      delay = Math.min(
+        options.baseDelay * Math.pow(2, attempt - 1),
+        options.maxDelay,
+      );
     }
 
     if (options.jitter) {
@@ -164,7 +176,7 @@ export class EnhancedRetryService {
   }
 
   private async sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private getOrCreateCircuit(name: string, options: CircuitBreakerOptions) {
@@ -173,16 +185,23 @@ export class EnhancedRetryService {
         state: CircuitBreakerState.CLOSED,
         failureCount: 0,
         lastFailureTime: 0,
-        options
+        options,
       });
     }
     return this.circuitBreakers.get(name)!;
   }
 
-  private createTimeoutPromise(timeout: number, circuitName: string): Promise<never> {
+  private createTimeoutPromise(
+    timeout: number,
+    circuitName: string,
+  ): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error(`Circuit breaker '${circuitName}' timeout after ${timeout}ms`));
+        reject(
+          new Error(
+            `Circuit breaker '${circuitName}' timeout after ${timeout}ms`,
+          ),
+        );
       }, timeout);
     });
   }
@@ -199,7 +218,7 @@ export class EnhancedRetryService {
       state: circuit.state,
       failureCount: circuit.failureCount,
       lastFailureTime: circuit.lastFailureTime,
-      options: circuit.options
+      options: circuit.options,
     };
   }
 
@@ -207,7 +226,9 @@ export class EnhancedRetryService {
    * Get all circuit breaker statuses
    */
   getAllCircuitStatuses() {
-    return Array.from(this.circuitBreakers.keys()).map(name => this.getCircuitStatus(name));
+    return Array.from(this.circuitBreakers.keys()).map((name) =>
+      this.getCircuitStatus(name),
+    );
   }
 
   /**
@@ -220,7 +241,7 @@ export class EnhancedRetryService {
     circuit.state = CircuitBreakerState.CLOSED;
     circuit.failureCount = 0;
     circuit.lastFailureTime = 0;
-    
+
     this.logger.info(`Circuit breaker '${circuitName}' manually reset`);
     return true;
   }

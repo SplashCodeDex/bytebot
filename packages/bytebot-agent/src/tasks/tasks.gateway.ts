@@ -25,7 +25,7 @@ export class TasksGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
-    // Use proper logger instead of console.log  
+    // Use proper logger instead of console.log
     // this.logger.log(`Client disconnected: ${client.id}`);
   }
 
@@ -57,25 +57,31 @@ export class TasksGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('task_deleted', taskId);
   }
 
-  emitProgressUpdate(taskId: string, progress: {
-    status: string;
-    iterationCount: number;
-    tokenUsage: number;
-    duration: number;
-    memoryUsage: number;
-    anomalies: number;
-    currentStep?: string;
-    estimatedCompletion?: number;
-  }): void {
+  emitProgressUpdate(
+    taskId: string,
+    progress: {
+      status: string;
+      iterationCount: number;
+      tokenUsage: number;
+      duration: number;
+      memoryUsage: number;
+      anomalies: number;
+      currentStep?: string;
+      estimatedCompletion?: number;
+    },
+  ): void {
     this.server.to(`task_${taskId}`).emit('task_progress', progress);
   }
 
-  emitAnomalyDetected(taskId: string, anomaly: {
-    type: string;
-    severity: string;
-    description: string;
-    suggestedActions: string[];
-  }): void {
+  emitAnomalyDetected(
+    taskId: string,
+    anomaly: {
+      type: string;
+      severity: string;
+      description: string;
+      suggestedActions: string[];
+    },
+  ): void {
     this.server.to(`task_${taskId}`).emit('task_anomaly', anomaly);
   }
 }

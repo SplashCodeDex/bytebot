@@ -14,7 +14,13 @@ export interface WorkflowExecutionContext {
 
 export interface NodeExecutionState {
   nodeId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped' | 'waiting_approval';
+  status:
+    | 'pending'
+    | 'running'
+    | 'completed'
+    | 'failed'
+    | 'skipped'
+    | 'waiting_approval';
   startedAt?: Date;
   completedAt?: Date;
   result?: any;
@@ -73,7 +79,15 @@ export interface WorkflowEngineConfig {
 }
 
 export interface WorkflowEvent {
-  type: 'workflow_started' | 'workflow_completed' | 'workflow_failed' | 'node_started' | 'node_completed' | 'node_failed' | 'approval_requested' | 'approval_received';
+  type:
+    | 'workflow_started'
+    | 'workflow_completed'
+    | 'workflow_failed'
+    | 'node_started'
+    | 'node_completed'
+    | 'node_failed'
+    | 'approval_requested'
+    | 'approval_received';
   workflowId: string;
   executionId: string;
   nodeId?: string;

@@ -26,32 +26,40 @@ export class EnhancedSummariesService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly summariesService: SummariesService
+    private readonly summariesService: SummariesService,
   ) {}
 
   /**
    * Create optimized summary using advanced strategies
    */
   async createOptimizedSummary(
-    taskId: string, 
-    content: string, 
-    strategy: SummaryStrategy = { type: 'progressive', config: {} }
+    taskId: string,
+    content: string,
+    strategy: SummaryStrategy = { type: 'progressive', config: {} },
   ): Promise<{ summary: any; metrics: SummaryMetrics }> {
-    
     const originalTokens = this.estimateTokens(content);
-    
+
     let compressedContent: string;
     let keyActionsPreserved = 0;
-    
+
     switch (strategy.type) {
       case 'extractive':
-        compressedContent = await this.extractiveSummary(content, strategy.config);
+        compressedContent = await this.extractiveSummary(
+          content,
+          strategy.config,
+        );
         break;
       case 'abstractive':
-        compressedContent = await this.abstractiveSummary(content, strategy.config);
+        compressedContent = await this.abstractiveSummary(
+          content,
+          strategy.config,
+        );
         break;
       case 'hierarchical':
-        compressedContent = await this.hierarchicalSummary(content, strategy.config);
+        compressedContent = await this.hierarchicalSummary(
+          content,
+          strategy.config,
+        );
         break;
       case 'progressive':
         const result = await this.progressiveSummary(content, strategy.config);
@@ -63,11 +71,12 @@ export class EnhancedSummariesService {
     }
 
     const compressedTokens = this.estimateTokens(compressedContent);
-    const compressionRatio = originalTokens > 0 ? compressedTokens / originalTokens : 1;
+    const compressionRatio =
+      originalTokens > 0 ? compressedTokens / originalTokens : 1;
 
     const summary = await this.summariesService.create({
       content: compressedContent,
-      taskId
+      taskId,
     });
 
     const metrics: SummaryMetrics = {
@@ -75,10 +84,15 @@ export class EnhancedSummariesService {
       compressedTokens,
       compressionRatio,
       keyActionsPreserved,
-      contextRetention: this.calculateContextRetention(content, compressedContent)
+      contextRetention: this.calculateContextRetention(
+        content,
+        compressedContent,
+      ),
     };
 
-    this.logger.log(`Created optimized summary for task ${taskId}: ${Math.round((1 - compressionRatio) * 100)}% compression`);
+    this.logger.log(
+      `Created optimized summary for task ${taskId}: ${Math.round((1 - compressionRatio) * 100)}% compression`,
+    );
 
     return { summary, metrics };
   }
@@ -86,7 +100,10 @@ export class EnhancedSummariesService {
   /**
    * Progressive summarization strategy - maintains context while compressing
    */
-  private async progressiveSummary(content: string, config: any): Promise<{ summary: string; actionsPreserved: number }> {
+  private async progressiveSummary(
+    content: string,
+    config: any,
+  ): Promise<{ summary: string; actionsPreserved: number }> {
     const sections = this.parseContentSections(content);
     const importantSections: string[] = [];
     let actionsPreserved = 0;
@@ -107,7 +124,10 @@ export class EnhancedSummariesService {
   /**
    * Hierarchical summarization - creates multi-level summaries
    */
-  private async hierarchicalSummary(content: string, config: any): Promise<string> {
+  private async hierarchicalSummary(
+    content: string,
+    config: any,
+  ): Promise<string> {
     const paragraphs = content.split('\n\n');
     const compressed: string[] = [];
 
@@ -125,17 +145,24 @@ export class EnhancedSummariesService {
   /**
    * Extractive summarization - extracts key sentences
    */
-  private async extractiveSummary(content: string, config: any): Promise<string> {
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    const scored = sentences.map(sentence => ({
+  private async extractiveSummary(
+    content: string,
+    config: any,
+  ): Promise<string> {
+    const sentences = content
+      .split(/[.!?]+/)
+      .filter((s) => s.trim().length > 10);
+    const scored = sentences.map((sentence) => ({
       sentence: sentence.trim(),
-      score: this.scoreSentenceImportance(sentence)
+      score: this.scoreSentenceImportance(sentence),
     }));
 
     scored.sort((a, b) => b.score - a.score);
-    
-    const maxSentences = config.maxLength ? Math.floor(config.maxLength / 50) : Math.ceil(sentences.length * 0.3);
-    const selected = scored.slice(0, maxSentences).map(item => item.sentence);
+
+    const maxSentences = config.maxLength
+      ? Math.floor(config.maxLength / 50)
+      : Math.ceil(sentences.length * 0.3);
+    const selected = scored.slice(0, maxSentences).map((item) => item.sentence);
 
     return selected.join('. ') + '.';
   }
@@ -143,7 +170,10 @@ export class EnhancedSummariesService {
   /**
    * Abstractive summarization - generates new summary text
    */
-  private async abstractiveSummary(content: string, config: any): Promise<string> {
+  private async abstractiveSummary(
+    content: string,
+    config: any,
+  ): Promise<string> {
     // This would integrate with an AI service for abstractive summarization
     // For now, return a simplified version
     const keyPoints = this.extractKeyPoints(content);
@@ -160,12 +190,14 @@ export class EnhancedSummariesService {
     const result = await this.prisma.summary.deleteMany({
       where: {
         createdAt: {
-          lt: cutoffDate
-        }
-      }
+          lt: cutoffDate,
+        },
+      },
     });
 
-    this.logger.log(`Cleaned up ${result.count} old summaries older than ${olderThanDays} days`);
+    this.logger.log(
+      `Cleaned up ${result.count} old summaries older than ${olderThanDays} days`,
+    );
     return result.count;
   }
 
@@ -175,50 +207,71 @@ export class EnhancedSummariesService {
   async compressExistingSummaries(taskId: string): Promise<void> {
     const summaries = await this.prisma.summary.findMany({
       where: { taskId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     if (summaries.length <= 5) return; // Keep recent summaries as-is
 
     // Compress older summaries
     const oldSummaries = summaries.slice(5);
-    const combinedContent = oldSummaries.map(s => s.content).join('\n\n');
-    
+    const combinedContent = oldSummaries.map((s) => s.content).join('\n\n');
+
     const { summary: compressedSummary } = await this.createOptimizedSummary(
       taskId,
       combinedContent,
-      { type: 'progressive', config: { compressionRatio: 0.3 } }
+      { type: 'progressive', config: { compressionRatio: 0.3 } },
     );
 
     // Delete old summaries and keep the compressed one
     await this.prisma.summary.deleteMany({
       where: {
-        id: { in: oldSummaries.map(s => s.id) }
-      }
+        id: { in: oldSummaries.map((s) => s.id) },
+      },
     });
 
-    this.logger.log(`Compressed ${oldSummaries.length} summaries for task ${taskId}`);
+    this.logger.log(
+      `Compressed ${oldSummaries.length} summaries for task ${taskId}`,
+    );
   }
 
   private parseContentSections(content: string): string[] {
     // Split content into logical sections
-    return content.split(/\n\s*\n/).filter(section => section.trim().length > 0);
+    return content
+      .split(/\n\s*\n/)
+      .filter((section) => section.trim().length > 0);
   }
 
   private isImportantSection(section: string): boolean {
     const importantKeywords = [
-      'error', 'failed', 'success', 'completed', 'action', 'result',
-      'click', 'type', 'scroll', 'screenshot', 'found', 'created'
+      'error',
+      'failed',
+      'success',
+      'completed',
+      'action',
+      'result',
+      'click',
+      'type',
+      'scroll',
+      'screenshot',
+      'found',
+      'created',
     ];
-    
+
     const lowerSection = section.toLowerCase();
-    return importantKeywords.some(keyword => lowerSection.includes(keyword));
+    return importantKeywords.some((keyword) => lowerSection.includes(keyword));
   }
 
   private containsActions(section: string): boolean {
-    const actionKeywords = ['click', 'type', 'scroll', 'screenshot', 'key', 'mouse'];
+    const actionKeywords = [
+      'click',
+      'type',
+      'scroll',
+      'screenshot',
+      'key',
+      'mouse',
+    ];
     const lowerSection = section.toLowerCase();
-    return actionKeywords.some(keyword => lowerSection.includes(keyword));
+    return actionKeywords.some((keyword) => lowerSection.includes(keyword));
   }
 
   private compressSection(section: string, config: any): string {
@@ -232,7 +285,9 @@ export class EnhancedSummariesService {
 
   private compressParagraph(paragraph: string, config: any): string {
     const sentences = paragraph.split(/[.!?]+/);
-    const important = sentences.filter(s => this.scoreSentenceImportance(s) > 0.5);
+    const important = sentences.filter(
+      (s) => this.scoreSentenceImportance(s) > 0.5,
+    );
     return important.join('. ').trim() + '.';
   }
 
@@ -241,7 +296,11 @@ export class EnhancedSummariesService {
     const lower = sentence.toLowerCase();
 
     // Action words
-    if (/\b(click|type|scroll|screenshot|found|error|success|completed)\b/.test(lower)) {
+    if (
+      /\b(click|type|scroll|screenshot|found|error|success|completed)\b/.test(
+        lower,
+      )
+    ) {
       score += 0.3;
     }
 
@@ -269,7 +328,9 @@ export class EnhancedSummariesService {
 
     for (const section of sections) {
       const sentences = section.split(/[.!?]+/);
-      const important = sentences.find(s => this.scoreSentenceImportance(s) > 0.7);
+      const important = sentences.find(
+        (s) => this.scoreSentenceImportance(s) > 0.7,
+      );
       if (important) {
         keyPoints.push(important.trim());
       }
@@ -278,12 +339,19 @@ export class EnhancedSummariesService {
     return keyPoints.slice(0, 5); // Limit to 5 key points
   }
 
-  private calculateContextRetention(original: string, compressed: string): number {
+  private calculateContextRetention(
+    original: string,
+    compressed: string,
+  ): number {
     const originalWords = new Set(original.toLowerCase().split(/\s+/));
     const compressedWords = new Set(compressed.toLowerCase().split(/\s+/));
-    
-    const retainedWords = Array.from(originalWords).filter(word => compressedWords.has(word));
-    return originalWords.size > 0 ? retainedWords.length / originalWords.size : 1;
+
+    const retainedWords = Array.from(originalWords).filter((word) =>
+      compressedWords.has(word),
+    );
+    return originalWords.size > 0
+      ? retainedWords.length / originalWords.size
+      : 1;
   }
 
   private estimateTokens(text: string): number {
@@ -296,18 +364,21 @@ export class EnhancedSummariesService {
    */
   async getSummarizationStats(taskId?: string) {
     const where = taskId ? { taskId } : {};
-    
+
     const summaries = await this.prisma.summary.findMany({
       where,
       select: {
         content: true,
         createdAt: true,
-        taskId: true
-      }
+        taskId: true,
+      },
     });
 
     const totalSummaries = summaries.length;
-    const totalTokens = summaries.reduce((sum, s) => sum + this.estimateTokens(s.content), 0);
+    const totalTokens = summaries.reduce(
+      (sum, s) => sum + this.estimateTokens(s.content),
+      0,
+    );
     const averageTokens = totalSummaries > 0 ? totalTokens / totalSummaries : 0;
 
     return {
@@ -315,7 +386,8 @@ export class EnhancedSummariesService {
       totalTokens,
       averageTokens,
       oldestSummary: summaries.length > 0 ? summaries[0].createdAt : null,
-      newestSummary: summaries.length > 0 ? summaries[summaries.length - 1].createdAt : null
+      newestSummary:
+        summaries.length > 0 ? summaries[summaries.length - 1].createdAt : null,
     };
   }
 }

@@ -18,7 +18,10 @@ import { TasksService } from '../tasks/tasks.service';
 @Injectable()
 export class WorkflowEngine {
   private readonly logger = new Logger(WorkflowEngine.name);
-  private readonly activeExecutions = new Map<string, WorkflowExecutionContext>();
+  private readonly activeExecutions = new Map<
+    string,
+    WorkflowExecutionContext
+  >();
   private readonly config: WorkflowEngineConfig;
 
   constructor(
@@ -151,7 +154,7 @@ export class WorkflowEngine {
 
     // Find entry points (nodes with no dependencies)
     const entryPoints = workflow.nodes.filter(
-      node => node.dependencies.length === 0,
+      (node) => node.dependencies.length === 0,
     );
 
     if (entryPoints.length === 0) {
@@ -159,9 +162,15 @@ export class WorkflowEngine {
     }
 
     // Start execution with entry points
-    await this.executeNodes(context, entryPoints.map(n => n.id), workflow);
+    await this.executeNodes(
+      context,
+      entryPoints.map((n) => n.id),
+      workflow,
+    );
 
-    this.logger.log(`Started workflow execution ${execution.id} for workflow ${workflowId}`);
+    this.logger.log(
+      `Started workflow execution ${execution.id} for workflow ${workflowId}`,
+    );
     return execution.id;
   }
 
@@ -173,7 +182,10 @@ export class WorkflowEngine {
     const startTime = Date.now();
 
     for (const nodeId of nodeIds) {
-      if (context.executionStack.length >= this.config.maxConcurrentNodesPerWorkflow) {
+      if (
+        context.executionStack.length >=
+        this.config.maxConcurrentNodesPerWorkflow
+      ) {
         // Queue for later execution
         await this.queueNodeExecution(context, nodeId);
         continue;
@@ -273,7 +285,6 @@ export class WorkflowEngine {
 
       // Check if workflow is complete
       await this.checkWorkflowCompletion(context, workflow);
-
     } catch (error) {
       await this.handleNodeError(context, node, error);
     } finally {
@@ -284,7 +295,10 @@ export class WorkflowEngine {
     }
   }
 
-  private async executeTaskNode(context: WorkflowExecutionContext, node: any): Promise<any> {
+  private async executeTaskNode(
+    context: WorkflowExecutionContext,
+    node: any,
+  ): Promise<any> {
     const config = node.config;
     const prompt = this.interpolateVariables(config.prompt, context.variables);
 
@@ -292,12 +306,18 @@ export class WorkflowEngine {
     const task = await this.tasksService.create({
       description: prompt,
       priority: config.priority || 'MEDIUM',
-      model: config.model || { provider: 'anthropic', name: 'claude-3-sonnet-20240229' },
+      model: config.model || {
+        provider: 'anthropic',
+        name: 'claude-3-sonnet-20240229',
+      },
     });
 
     // Wait for task completion (implement polling or use events)
-    const result = await this.waitForTaskCompletion(task.id, config.timeout || this.config.defaultTimeout);
-    
+    const result = await this.waitForTaskCompletion(
+      task.id,
+      config.timeout || this.config.defaultTimeout,
+    );
+
     // Store result in context variables if specified
     if (config.outputVariable) {
       context.variables[config.outputVariable] = result;
@@ -312,7 +332,11 @@ export class WorkflowEngine {
     workflow: any,
   ): Promise<any> {
     const config = node.config;
-    const conditionResult = this.evaluateConditions(config.conditions, context.variables, config.operator);
+    const conditionResult = this.evaluateConditions(
+      config.conditions,
+      context.variables,
+      config.operator,
+    );
 
     // Execute appropriate path based on condition result
     const pathNodes = conditionResult ? config.truePath : config.falsePath;
@@ -320,7 +344,10 @@ export class WorkflowEngine {
       await this.executeNodes(context, pathNodes, workflow);
     }
 
-    return { conditionResult, executedPath: conditionResult ? 'true' : 'false' };
+    return {
+      conditionResult,
+      executedPath: conditionResult ? 'true' : 'false',
+    };
   }
 
   private async executeLoopNode(
@@ -338,12 +365,19 @@ export class WorkflowEngine {
         break;
       }
 
-      if (config.condition && !this.evaluateConditions([config.condition], context.variables)) {
+      if (
+        config.condition &&
+        !this.evaluateConditions([config.condition], context.variables)
+      ) {
         break;
       }
 
       // Execute loop body
-      const bodyResults = await this.executeNodes(context, config.bodyNodes, workflow);
+      const bodyResults = await this.executeNodes(
+        context,
+        config.bodyNodes,
+        workflow,
+      );
       results.push(bodyResults);
       iterations++;
 
@@ -367,7 +401,7 @@ export class WorkflowEngine {
     for (let i = 0; i < config.branches.length; i++) {
       const branch = config.branches[i];
       const branchId = `${node.id}_branch_${i}`;
-      
+
       context.parallelBranches.set(branchId, {
         branchId,
         nodeIds: branch,
@@ -388,7 +422,10 @@ export class WorkflowEngine {
     }
   }
 
-  private async executeApprovalNode(context: WorkflowExecutionContext, node: any): Promise<any> {
+  private async executeApprovalNode(
+    context: WorkflowExecutionContext,
+    node: any,
+  ): Promise<any> {
     const config = node.config;
     const expiresAt = new Date(Date.now() + config.timeoutMinutes * 60 * 1000);
 
@@ -429,7 +466,10 @@ export class WorkflowEngine {
     return { approvalId: approval.id, status: 'pending' };
   }
 
-  private async executeDelayNode(context: WorkflowExecutionContext, node: any): Promise<any> {
+  private async executeDelayNode(
+    context: WorkflowExecutionContext,
+    node: any,
+  ): Promise<any> {
     const config = node.config;
     let delay = config.duration;
 
@@ -437,14 +477,22 @@ export class WorkflowEngine {
       delay = context.variables[config.dynamicDuration];
     }
 
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
     return { delayed: delay };
   }
 
-  private async executeWebhookNode(context: WorkflowExecutionContext, node: any): Promise<any> {
+  private async executeWebhookNode(
+    context: WorkflowExecutionContext,
+    node: any,
+  ): Promise<any> {
     const config = node.config;
     const url = this.interpolateVariables(config.url, context.variables);
-    const body = config.body ? this.interpolateVariables(JSON.stringify(config.body), context.variables) : undefined;
+    const body = config.body
+      ? this.interpolateVariables(
+          JSON.stringify(config.body),
+          context.variables,
+        )
+      : undefined;
 
     const response = await fetch(url, {
       method: config.method,
@@ -463,7 +511,10 @@ export class WorkflowEngine {
   }
 
   // Helper methods
-  private mergeVariables(workflowVars: any[], inputVars: Record<string, any>): Record<string, any> {
+  private mergeVariables(
+    workflowVars: any[],
+    inputVars: Record<string, any>,
+  ): Record<string, any> {
     const merged: Record<string, any> = {};
 
     // Set defaults from workflow variables
@@ -486,9 +537,14 @@ export class WorkflowEngine {
     return merged;
   }
 
-  private interpolateVariables(template: string, variables: Record<string, any>): string {
+  private interpolateVariables(
+    template: string,
+    variables: Record<string, any>,
+  ): string {
     return template.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
-      return variables[varName] !== undefined ? String(variables[varName]) : match;
+      return variables[varName] !== undefined
+        ? String(variables[varName])
+        : match;
     });
   }
 
@@ -499,12 +555,19 @@ export class WorkflowEngine {
   ): boolean {
     if (conditions.length === 0) return true;
 
-    const results = conditions.map(condition => this.evaluateCondition(condition, variables));
+    const results = conditions.map((condition) =>
+      this.evaluateCondition(condition, variables),
+    );
 
-    return operator === 'AND' ? results.every(r => r) : results.some(r => r);
+    return operator === 'AND'
+      ? results.every((r) => r)
+      : results.some((r) => r);
   }
 
-  private evaluateCondition(condition: any, variables: Record<string, any>): boolean {
+  private evaluateCondition(
+    condition: any,
+    variables: Record<string, any>,
+  ): boolean {
     const fieldValue = this.getNestedValue(variables, condition.field);
     const expectedValue = condition.value;
 
@@ -534,7 +597,10 @@ export class WorkflowEngine {
     return path.split('.').reduce((current, key) => current?.[key], obj);
   }
 
-  private async checkDependencies(context: WorkflowExecutionContext, node: any): Promise<boolean> {
+  private async checkDependencies(
+    context: WorkflowExecutionContext,
+    node: any,
+  ): Promise<boolean> {
     for (const dependency of node.dependencies) {
       const depState = context.nodeStates.get(dependency.dependsOnNodeId);
       if (!depState || depState.status !== 'completed') {
@@ -544,13 +610,20 @@ export class WorkflowEngine {
     return true;
   }
 
-  private async getNextNodes(context: WorkflowExecutionContext, completedNode: any, workflow: any): Promise<string[]> {
+  private async getNextNodes(
+    context: WorkflowExecutionContext,
+    completedNode: any,
+    workflow: any,
+  ): Promise<string[]> {
     const nextNodes: string[] = [];
 
     for (const node of workflow.nodes) {
       for (const dependency of node.dependencies) {
         if (dependency.dependsOnNodeId === completedNode.id) {
-          const dependenciesSatisfied = await this.checkDependencies(context, node);
+          const dependenciesSatisfied = await this.checkDependencies(
+            context,
+            node,
+          );
           if (dependenciesSatisfied) {
             nextNodes.push(node.id);
           }
@@ -561,7 +634,11 @@ export class WorkflowEngine {
     return nextNodes;
   }
 
-  private async handleNodeError(context: WorkflowExecutionContext, node: any, error: any): Promise<void> {
+  private async handleNodeError(
+    context: WorkflowExecutionContext,
+    node: any,
+    error: any,
+  ): Promise<void> {
     const nodeState = context.nodeStates.get(node.id);
     if (!nodeState) return;
 
@@ -573,9 +650,15 @@ export class WorkflowEngine {
       // Calculate retry delay
       let delay = retryPolicy.baseDelay;
       if (retryPolicy.backoffStrategy === 'exponential') {
-        delay = Math.min(retryPolicy.baseDelay * Math.pow(2, nodeState.retryCount), retryPolicy.maxDelay);
+        delay = Math.min(
+          retryPolicy.baseDelay * Math.pow(2, nodeState.retryCount),
+          retryPolicy.maxDelay,
+        );
       } else if (retryPolicy.backoffStrategy === 'linear') {
-        delay = Math.min(retryPolicy.baseDelay * nodeState.retryCount, retryPolicy.maxDelay);
+        delay = Math.min(
+          retryPolicy.baseDelay * nodeState.retryCount,
+          retryPolicy.maxDelay,
+        );
       }
 
       // Schedule retry
@@ -617,20 +700,29 @@ export class WorkflowEngine {
     });
   }
 
-  private async waitForTaskCompletion(taskId: string, timeout: number): Promise<any> {
+  private async waitForTaskCompletion(
+    taskId: string,
+    timeout: number,
+  ): Promise<any> {
     // Implementation would poll task status or use event-based approach
     // For now, return a placeholder
-    return { taskId, status: 'completed', result: 'Task completed successfully' };
+    return {
+      taskId,
+      status: 'completed',
+      result: 'Task completed successfully',
+    };
   }
 
-  private async updateExecutionState(context: WorkflowExecutionContext): Promise<void> {
+  private async updateExecutionState(
+    context: WorkflowExecutionContext,
+  ): Promise<void> {
     const completedNodes = Array.from(context.nodeStates.values())
-      .filter(state => state.status === 'completed')
-      .map(state => state.nodeId);
+      .filter((state) => state.status === 'completed')
+      .map((state) => state.nodeId);
 
     const failedNodes = Array.from(context.nodeStates.values())
-      .filter(state => state.status === 'failed')
-      .map(state => state.nodeId);
+      .filter((state) => state.status === 'failed')
+      .map((state) => state.nodeId);
 
     await this.prisma.workflowExecution.update({
       where: { id: context.executionId },
@@ -642,9 +734,12 @@ export class WorkflowEngine {
     });
   }
 
-  private async checkWorkflowCompletion(context: WorkflowExecutionContext, workflow: any): Promise<void> {
+  private async checkWorkflowCompletion(
+    context: WorkflowExecutionContext,
+    workflow: any,
+  ): Promise<void> {
     const allNodesProcessed = Array.from(context.nodeStates.values()).every(
-      state => ['completed', 'failed', 'skipped'].includes(state.status),
+      (state) => ['completed', 'failed', 'skipped'].includes(state.status),
     );
 
     if (allNodesProcessed) {
@@ -671,7 +766,10 @@ export class WorkflowEngine {
     }
   }
 
-  private async failWorkflow(context: WorkflowExecutionContext, error: string): Promise<void> {
+  private async failWorkflow(
+    context: WorkflowExecutionContext,
+    error: string,
+  ): Promise<void> {
     await this.prisma.workflowExecution.update({
       where: { id: context.executionId },
       data: {
@@ -692,12 +790,19 @@ export class WorkflowEngine {
     });
   }
 
-  private async escalateError(context: WorkflowExecutionContext, node: any, error: any): Promise<void> {
+  private async escalateError(
+    context: WorkflowExecutionContext,
+    node: any,
+    error: any,
+  ): Promise<void> {
     // Implementation for error escalation (notifications, etc.)
     this.logger.error(`Escalating error for node ${node.id}: ${error.message}`);
   }
 
-  private async queueNodeExecution(context: WorkflowExecutionContext, nodeId: string): Promise<void> {
+  private async queueNodeExecution(
+    context: WorkflowExecutionContext,
+    nodeId: string,
+  ): Promise<void> {
     // Implementation for queuing node execution when limits are reached
     this.logger.debug(`Queuing node ${nodeId} for later execution`);
   }

@@ -12,7 +12,12 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { WorkflowService } from './workflow.service';
-import { CreateWorkflowDto, UpdateWorkflowDto, ExecuteWorkflowDto, CreateScheduleDto } from './dto';
+import {
+  CreateWorkflowDto,
+  UpdateWorkflowDto,
+  ExecuteWorkflowDto,
+  CreateScheduleDto,
+} from './dto';
 
 @Controller('workflows')
 export class WorkflowController {
@@ -93,10 +98,13 @@ export class WorkflowController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const timeRange = startDate && endDate ? {
-      start: new Date(startDate),
-      end: new Date(endDate),
-    } : undefined;
+    const timeRange =
+      startDate && endDate
+        ? {
+            start: new Date(startDate),
+            end: new Date(endDate),
+          }
+        : undefined;
 
     return this.workflowService.getWorkflowMetrics(id, timeRange);
   }

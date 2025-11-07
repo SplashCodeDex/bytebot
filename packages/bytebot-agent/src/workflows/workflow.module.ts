@@ -8,11 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    TasksModule,
-    EventEmitterModule.forRoot(),
-  ],
+  imports: [PrismaModule, TasksModule, EventEmitterModule.forRoot()],
   controllers: [WorkflowController],
   providers: [WorkflowService, WorkflowEngine, WorkflowGateway],
   exports: [WorkflowService, WorkflowEngine],

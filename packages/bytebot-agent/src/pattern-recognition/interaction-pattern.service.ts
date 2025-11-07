@@ -16,9 +16,12 @@ export class InteractionPatternService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async startLearningSession(userId: string, sessionId?: string): Promise<string> {
+  async startLearningSession(
+    userId: string,
+    sessionId?: string,
+  ): Promise<string> {
     const id = sessionId || this.generateSessionId();
-    
+
     const session: LearningSession = {
       id,
       userId,
@@ -30,7 +33,7 @@ export class InteractionPatternService {
     };
 
     this.activeSessions.set(id, session);
-    
+
     this.logger.log(`Started learning session ${id} for user ${userId}`);
     return id;
   }
@@ -52,11 +55,13 @@ export class InteractionPatternService {
       data: {
         sessionId,
         type: interaction.type,
-        element: interaction.target ? {
-          boundingBox: interaction.target.element.boundingBox,
-          attributes: interaction.target.element.attributes,
-          type: interaction.target.element.type,
-        } : null,
+        element: interaction.target
+          ? {
+              boundingBox: interaction.target.element.boundingBox,
+              attributes: interaction.target.element.attributes,
+              type: interaction.target.element.type,
+            }
+          : null,
         data: interaction.data,
         applicationName: context.applicationName,
         windowTitle: context.windowTitle,
@@ -68,8 +73,11 @@ export class InteractionPatternService {
     // Add to active session for real-time analysis
     const step: InteractionStep = {
       id: this.generateId(),
-      order: session.interactions.reduce((max, seq) => 
-        Math.max(max, seq.steps.length), 0) + 1,
+      order:
+        session.interactions.reduce(
+          (max, seq) => Math.max(max, seq.steps.length),
+          0,
+        ) + 1,
       ...interaction,
     };
 
@@ -96,12 +104,14 @@ export class InteractionPatternService {
     await this.persistSession(session);
 
     this.activeSessions.delete(sessionId);
-    
+
     this.logger.log(`Ended learning session ${sessionId}`);
     return session;
   }
 
-  async getAutomationSuggestions(sessionId: string): Promise<AutomationSuggestion[]> {
+  async getAutomationSuggestions(
+    sessionId: string,
+  ): Promise<AutomationSuggestion[]> {
     const session = this.activeSessions.get(sessionId);
     if (session) {
       return session.automationOpportunities;
@@ -131,9 +141,10 @@ export class InteractionPatternService {
       }
     }
 
-    return similar.sort((a, b) => 
-      this.calculateSequenceSimilarity(sequence, b) - 
-      this.calculateSequenceSimilarity(sequence, a)
+    return similar.sort(
+      (a, b) =>
+        this.calculateSequenceSimilarity(sequence, b) -
+        this.calculateSequenceSimilarity(sequence, a),
     );
   }
 
@@ -144,7 +155,7 @@ export class InteractionPatternService {
 
     for (let i = 0; i < pattern.steps.length; i++) {
       const step = pattern.steps[i];
-      
+
       const node = {
         id: `step_${i + 1}`,
         type: this.mapInteractionToNodeType(step.type),
@@ -182,7 +193,7 @@ export class InteractionPatternService {
     for (const sequence of session.interactions) {
       const similarity = this.calculateStepSimilarity(
         step,
-        sequence.steps[sequence.steps.length - 1]
+        sequence.steps[sequence.steps.length - 1],
       );
 
       if (similarity > bestSimilarity && similarity > 0.7) {
@@ -217,27 +228,34 @@ export class InteractionPatternService {
     }
   }
 
-  private async analyzeSessionPatterns(session: LearningSession): Promise<void> {
+  private async analyzeSessionPatterns(
+    session: LearningSession,
+  ): Promise<void> {
     // Look for repetitive patterns
-    const repetitiveSequences = this.findRepetitiveSequences(session.interactions);
-    
+    const repetitiveSequences = this.findRepetitiveSequences(
+      session.interactions,
+    );
+
     for (const sequence of repetitiveSequences) {
-      if (sequence.frequency >= 3) { // Repeated 3+ times
+      if (sequence.frequency >= 3) {
+        // Repeated 3+ times
         const suggestion: AutomationSuggestion = {
           id: this.generateId(),
           type: 'workflow_creation',
           title: `Automate Repetitive ${sequence.context.workflowCategory} Task`,
           description: `This sequence of ${sequence.steps.length} steps has been repeated ${sequence.frequency} times`,
-          confidence: Math.min(0.9, 0.5 + (sequence.frequency * 0.1)),
+          confidence: Math.min(0.9, 0.5 + sequence.frequency * 0.1),
           impact: sequence.steps.length > 5 ? 'high' : 'medium',
           effort: this.estimateAutomationEffort(sequence),
           category: sequence.context.workflowCategory,
-          actions: [{
-            type: 'create_workflow',
-            description: 'Create automated workflow from this pattern',
-            parameters: { sequence },
-            automatable: true,
-          }],
+          actions: [
+            {
+              type: 'create_workflow',
+              description: 'Create automated workflow from this pattern',
+              parameters: { sequence },
+              automatable: true,
+            },
+          ],
           benefits: [
             `Save ~${this.estimateTimeSavings(sequence)} minutes per execution`,
             'Reduce human error',
@@ -266,7 +284,7 @@ export class InteractionPatternService {
       for (let j = 1; j <= seq2.steps.length; j++) {
         const stepSimilarity = this.calculateStepSimilarity(
           seq1.steps[i - 1],
-          seq2.steps[j - 1]
+          seq2.steps[j - 1],
         );
 
         if (stepSimilarity > 0.7) {
@@ -279,11 +297,14 @@ export class InteractionPatternService {
 
     const lcs = dp[seq1.steps.length][seq2.steps.length];
     const maxLength = Math.max(seq1.steps.length, seq2.steps.length);
-    
+
     return maxLength > 0 ? lcs / maxLength : 0;
   }
 
-  private calculateStepSimilarity(step1: InteractionStep, step2: InteractionStep): number {
+  private calculateStepSimilarity(
+    step1: InteractionStep,
+    step2: InteractionStep,
+  ): number {
     let similarity = 0;
 
     // Type similarity (40% weight)
@@ -293,13 +314,19 @@ export class InteractionPatternService {
 
     // Target similarity (40% weight)
     if (step1.target && step2.target) {
-      const targetSimilarity = this.calculateTargetSimilarity(step1.target, step2.target);
+      const targetSimilarity = this.calculateTargetSimilarity(
+        step1.target,
+        step2.target,
+      );
       similarity += targetSimilarity * 0.4;
     }
 
     // Data similarity (20% weight)
     if (step1.data && step2.data) {
-      const dataSimilarity = this.calculateDataSimilarity(step1.data, step2.data);
+      const dataSimilarity = this.calculateDataSimilarity(
+        step1.data,
+        step2.data,
+      );
       similarity += dataSimilarity * 0.2;
     }
 
@@ -321,13 +348,13 @@ export class InteractionPatternService {
     // Position similarity (within reasonable bounds)
     const pos1 = target1.element.boundingBox;
     const pos2 = target2.element.boundingBox;
-    
+
     if (pos1 && pos2) {
       const distance = Math.sqrt(
-        Math.pow(pos1.x - pos2.x, 2) + Math.pow(pos1.y - pos2.y, 2)
+        Math.pow(pos1.x - pos2.x, 2) + Math.pow(pos1.y - pos2.y, 2),
       );
       const maxDistance = 100; // pixels
-      const positionSimilarity = Math.max(0, 1 - (distance / maxDistance));
+      const positionSimilarity = Math.max(0, 1 - distance / maxDistance);
       similarity += positionSimilarity * 0.3;
     }
 
@@ -339,9 +366,9 @@ export class InteractionPatternService {
       // Use Levenshtein distance for text similarity
       const maxLength = Math.max(data1.length, data2.length);
       if (maxLength === 0) return 1;
-      
+
       const distance = this.levenshteinDistance(data1, data2);
-      return 1 - (distance / maxLength);
+      return 1 - distance / maxLength;
     }
 
     if (JSON.stringify(data1) === JSON.stringify(data2)) {
@@ -351,7 +378,9 @@ export class InteractionPatternService {
     return 0;
   }
 
-  private async calculateAutomationPotential(steps: InteractionStep[]): Promise<AutomationPotential> {
+  private async calculateAutomationPotential(
+    steps: InteractionStep[],
+  ): Promise<AutomationPotential> {
     let score = 0.5; // Base score
     const reasoning: string[] = [];
     let complexity: 'low' | 'medium' | 'high' = 'medium';
@@ -366,7 +395,11 @@ export class InteractionPatternService {
           reasoning.push('Click actions are easily automatable');
           break;
         case 'type':
-          if (step.data && typeof step.data === 'string' && step.data.length > 0) {
+          if (
+            step.data &&
+            typeof step.data === 'string' &&
+            step.data.length > 0
+          ) {
             score += 0.15;
             reasoning.push('Text input can be automated');
           }
@@ -394,10 +427,11 @@ export class InteractionPatternService {
     }
 
     // Check for conditional logic needs
-    const hasVariableData = steps.some(step => 
-      step.data && typeof step.data === 'string' && /\d/.test(step.data)
+    const hasVariableData = steps.some(
+      (step) =>
+        step.data && typeof step.data === 'string' && /\d/.test(step.data),
     );
-    
+
     if (hasVariableData) {
       prerequisites.push('Variable data extraction capabilities');
       reasoning.push('Contains variable data that needs parameterization');
@@ -414,18 +448,20 @@ export class InteractionPatternService {
     };
   }
 
-  private findRepetitiveSequences(sequences: UserInteractionSequence[]): UserInteractionSequence[] {
+  private findRepetitiveSequences(
+    sequences: UserInteractionSequence[],
+  ): UserInteractionSequence[] {
     const repetitive: UserInteractionSequence[] = [];
     const sequenceGroups = new Map<string, UserInteractionSequence[]>();
 
     // Group similar sequences
     for (const sequence of sequences) {
       const signature = this.generateSequenceSignature(sequence);
-      
+
       if (!sequenceGroups.has(signature)) {
         sequenceGroups.set(signature, []);
       }
-      
+
       sequenceGroups.get(signature)!.push(sequence);
     }
 
@@ -444,29 +480,39 @@ export class InteractionPatternService {
 
   private generateSequenceSignature(sequence: UserInteractionSequence): string {
     return sequence.steps
-      .map(step => `${step.type}:${step.target?.element.type || 'unknown'}`)
+      .map((step) => `${step.type}:${step.target?.element.type || 'unknown'}`)
       .join('|');
   }
 
-  private mergeSequences(sequences: UserInteractionSequence[]): UserInteractionSequence {
+  private mergeSequences(
+    sequences: UserInteractionSequence[],
+  ): UserInteractionSequence {
     // Use the first sequence as the base and merge characteristics
     const base = { ...sequences[0] };
-    
+
     // Average the automation potential
-    const avgScore = sequences.reduce((sum, seq) => sum + seq.automationPotential.score, 0) / sequences.length;
+    const avgScore =
+      sequences.reduce((sum, seq) => sum + seq.automationPotential.score, 0) /
+      sequences.length;
     base.automationPotential.score = avgScore;
 
     return base;
   }
 
-  private isSequenceContinuation(sequence: UserInteractionSequence, step: InteractionStep): boolean {
+  private isSequenceContinuation(
+    sequence: UserInteractionSequence,
+    step: InteractionStep,
+  ): boolean {
     if (sequence.steps.length === 0) return true;
 
     const lastStep = sequence.steps[sequence.steps.length - 1];
-    const timeDiff = step.timing.startTime.getTime() - lastStep.timing.startTime.getTime();
-    
+    const timeDiff =
+      step.timing.startTime.getTime() - lastStep.timing.startTime.getTime();
+
     // Consider it a continuation if within 30 seconds and similar context
-    return timeDiff < 30000 && this.calculateStepSimilarity(lastStep, step) > 0.3;
+    return (
+      timeDiff < 30000 && this.calculateStepSimilarity(lastStep, step) > 0.3
+    );
   }
 
   private mapInteractionToNodeType(interactionType: string): string {
@@ -519,7 +565,7 @@ export class InteractionPatternService {
 
   private extractVariablesFromPattern(pattern: UserInteractionSequence): any[] {
     const variables: any[] = [];
-    
+
     for (const step of pattern.steps) {
       if (step.type === 'type' && step.data) {
         variables.push({
@@ -536,8 +582,12 @@ export class InteractionPatternService {
 
   private categorizeWorkflow(context: any): string {
     const app = context.applicationName?.toLowerCase() || '';
-    
-    if (app.includes('browser') || app.includes('chrome') || app.includes('firefox')) {
+
+    if (
+      app.includes('browser') ||
+      app.includes('chrome') ||
+      app.includes('firefox')
+    ) {
       return 'web_automation';
     } else if (app.includes('excel') || app.includes('calc')) {
       return 'data_processing';
@@ -555,7 +605,7 @@ export class InteractionPatternService {
 
   private extractDataTypes(step: InteractionStep): string[] {
     const types: string[] = [];
-    
+
     if (step.data) {
       if (typeof step.data === 'string') {
         if (/^\d+$/.test(step.data)) types.push('number');
@@ -573,10 +623,12 @@ export class InteractionPatternService {
     return [];
   }
 
-  private estimateAutomationEffort(sequence: UserInteractionSequence): 'low' | 'medium' | 'high' {
+  private estimateAutomationEffort(
+    sequence: UserInteractionSequence,
+  ): 'low' | 'medium' | 'high' {
     const stepCount = sequence.steps.length;
-    const hasComplexData = sequence.steps.some(step => 
-      step.data && typeof step.data === 'object'
+    const hasComplexData = sequence.steps.some(
+      (step) => step.data && typeof step.data === 'object',
     );
 
     if (stepCount <= 3 && !hasComplexData) return 'low';
@@ -589,28 +641,36 @@ export class InteractionPatternService {
     return sequence.steps.length * 0.5; // 30 seconds per step
   }
 
-  private estimateAutomationTime(steps: InteractionStep[], complexity: 'low' | 'medium' | 'high'): number {
+  private estimateAutomationTime(
+    steps: InteractionStep[],
+    complexity: 'low' | 'medium' | 'high',
+  ): number {
     const baseTime = steps.length * 10; // 10 minutes per step
-    const multiplier = complexity === 'low' ? 1 : complexity === 'medium' ? 1.5 : 2;
+    const multiplier =
+      complexity === 'low' ? 1 : complexity === 'medium' ? 1.5 : 2;
     return baseTime * multiplier;
   }
 
   private identifyAutomationRisks(sequence: UserInteractionSequence): string[] {
     const risks: string[] = [];
-    
-    if (sequence.steps.some(step => step.retryCount > 0)) {
+
+    if (sequence.steps.some((step) => step.retryCount > 0)) {
       risks.push('Contains steps that previously failed');
     }
 
-    if (sequence.context.dataInvolved.includes('email') || 
-        sequence.context.dataInvolved.includes('personal')) {
+    if (
+      sequence.context.dataInvolved.includes('email') ||
+      sequence.context.dataInvolved.includes('personal')
+    ) {
       risks.push('Handles sensitive data');
     }
 
     return risks;
   }
 
-  private async generateSessionInsights(session: LearningSession): Promise<void> {
+  private async generateSessionInsights(
+    session: LearningSession,
+  ): Promise<void> {
     // Generate insights about the session
     session.insights.push({
       type: 'repetitive_task',
@@ -621,7 +681,9 @@ export class InteractionPatternService {
     });
   }
 
-  private async generateAutomationSuggestions(session: LearningSession): Promise<void> {
+  private async generateAutomationSuggestions(
+    session: LearningSession,
+  ): Promise<void> {
     // Additional automation suggestions based on full session analysis
     for (const sequence of session.interactions) {
       if (sequence.automationPotential.score > 0.7) {
@@ -634,12 +696,14 @@ export class InteractionPatternService {
           impact: 'high',
           effort: sequence.automationPotential.complexity,
           category: sequence.context.workflowCategory,
-          actions: [{
-            type: 'create_workflow',
-            description: 'Create workflow from this high-potential sequence',
-            parameters: { sequence },
-            automatable: true,
-          }],
+          actions: [
+            {
+              type: 'create_workflow',
+              description: 'Create workflow from this high-potential sequence',
+              parameters: { sequence },
+              automatable: true,
+            },
+          ],
           benefits: [
             `Save ${sequence.automationPotential.estimatedTimeSavings} minutes per execution`,
             'High confidence automation',
@@ -655,7 +719,9 @@ export class InteractionPatternService {
 
   private async persistSession(session: LearningSession): Promise<void> {
     // In a real implementation, this would save the session to database
-    this.logger.debug(`Persisting session ${session.id} with ${session.interactions.length} sequences`);
+    this.logger.debug(
+      `Persisting session ${session.id} with ${session.interactions.length} sequences`,
+    );
   }
 
   private async getAllStoredSequences(): Promise<UserInteractionSequence[]> {
@@ -670,13 +736,17 @@ export class InteractionPatternService {
     return sequences;
   }
 
-  private async generateSuggestionsFromInteractions(interactions: any[]): Promise<AutomationSuggestion[]> {
+  private async generateSuggestionsFromInteractions(
+    interactions: any[],
+  ): Promise<AutomationSuggestion[]> {
     // Generate suggestions from raw interaction data
     return [];
   }
 
   private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    const matrix = Array(str2.length + 1)
+      .fill(null)
+      .map(() => Array(str1.length + 1).fill(null));
 
     for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
     for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;

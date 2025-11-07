@@ -7,10 +7,7 @@ import { ContextAwarenessService } from './context-awareness.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    EventEmitterModule.forRoot(),
-  ],
+  imports: [PrismaModule, EventEmitterModule.forRoot()],
   providers: [
     VisualPatternService,
     InteractionPatternService,

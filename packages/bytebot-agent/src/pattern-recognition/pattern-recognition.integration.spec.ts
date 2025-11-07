@@ -33,8 +33,12 @@ describe('Pattern Recognition Integration', () => {
     }).compile();
 
     taskPatternService = module.get<TaskPatternService>(TaskPatternService);
-    toolUsageAnalyzer = module.get<ToolUsageAnalyzerService>(ToolUsageAnalyzerService);
-    interactionPatternService = module.get<InteractionPatternService>(InteractionPatternService);
+    toolUsageAnalyzer = module.get<ToolUsageAnalyzerService>(
+      ToolUsageAnalyzerService,
+    );
+    interactionPatternService = module.get<InteractionPatternService>(
+      InteractionPatternService,
+    );
     prisma = module.get(PrismaService);
   });
 
@@ -61,16 +65,16 @@ describe('Pattern Recognition Integration', () => {
                 {
                   type: 'tool_use',
                   name: 'computer',
-                  input: { action: 'screenshot' }
+                  input: { action: 'screenshot' },
                 },
                 {
                   type: 'tool_use',
                   name: 'computer',
-                  input: { action: 'click', coordinate: [100, 200] }
-                }
-              ]
-            }
-          ]
+                  input: { action: 'click', coordinate: [100, 200] },
+                },
+              ],
+            },
+          ],
         },
         {
           id: 'task-2',
@@ -87,16 +91,16 @@ describe('Pattern Recognition Integration', () => {
                 {
                   type: 'tool_use',
                   name: 'computer',
-                  input: { action: 'screenshot' }
+                  input: { action: 'screenshot' },
                 },
                 {
                   type: 'tool_use',
                   name: 'computer',
-                  input: { action: 'click', coordinate: [150, 250] }
-                }
-              ]
-            }
-          ]
+                  input: { action: 'click', coordinate: [150, 250] },
+                },
+              ],
+            },
+          ],
         },
         {
           id: 'task-3',
@@ -109,30 +113,30 @@ describe('Pattern Recognition Integration', () => {
             {
               id: 'msg-3',
               role: 'assistant',
-              content: 'Error: Unable to connect to website'
-            }
-          ]
-        }
+              content: 'Error: Unable to connect to website',
+            },
+          ],
+        },
       ];
 
       prisma.task.findMany.mockResolvedValue(mockTasks as any);
       prisma.message.findMany.mockResolvedValue(
-        mockTasks.flatMap(task => task.messages) as any
+        mockTasks.flatMap((task) => task.messages) as any,
       );
 
       // Analyze patterns
       await taskPatternService.analyzeTaskPatterns();
-      
+
       // Get pattern statistics
       const stats = taskPatternService.getPatternStats();
-      
+
       expect(stats.totalPatterns).toBeGreaterThan(0);
       expect(stats.totalTasksAnalyzed).toBe(3);
       expect(stats.averageSuccessRate).toBeLessThan(1); // Should account for failed task
-      
+
       // Check failure reasons extraction
       const patterns = Array.from(taskPatternService['patterns'].values());
-      const failedPattern = patterns.find(p => p.failureReasons.length > 0);
+      const failedPattern = patterns.find((p) => p.failureReasons.length > 0);
       expect(failedPattern?.failureReasons).toContain('Network timeout');
     });
 
@@ -146,8 +150,8 @@ describe('Pattern Recognition Integration', () => {
             {
               type: 'tool_use',
               name: 'computer',
-              input: { action: 'screenshot' }
-            }
+              input: { action: 'screenshot' },
+            },
           ],
           createdAt: new Date(),
         },
@@ -159,23 +163,24 @@ describe('Pattern Recognition Integration', () => {
             {
               type: 'tool_use',
               name: 'computer',
-              input: { action: 'screenshot' }
-            }
+              input: { action: 'screenshot' },
+            },
           ],
           createdAt: new Date(),
-        }
+        },
       ];
 
       prisma.message.findMany.mockResolvedValue(mockMessages as any);
 
-      const recommendations = await toolUsageAnalyzer.getToolUsageRecommendations();
-      
+      const recommendations =
+        await toolUsageAnalyzer.getToolUsageRecommendations();
+
       expect(recommendations).toBeDefined();
       expect(recommendations.length).toBeGreaterThan(0);
-      
+
       // Should detect frequent screenshot usage
-      const screenshotRecommendation = recommendations.find(r => 
-        r.recommendation.includes('screenshot')
+      const screenshotRecommendation = recommendations.find((r) =>
+        r.recommendation.includes('screenshot'),
       );
       expect(screenshotRecommendation).toBeDefined();
     });
@@ -196,7 +201,7 @@ describe('Pattern Recognition Integration', () => {
       const patterns = interactionPatternService.getPatterns();
       expect(patterns.commonSequences.length).toBeGreaterThan(0);
       expect(patterns.successRates).toBeDefined();
-      
+
       // Should detect that click actions have mixed success rates
       expect(patterns.successRates['click']).toBeLessThan(1);
       expect(patterns.successRates['type']).toBe(1);
@@ -213,17 +218,17 @@ describe('Pattern Recognition Integration', () => {
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
           completedAt: new Date('2024-01-02'), // 1 day duration
-          messages: []
+          messages: [],
         },
         {
-          id: 'task-2', 
+          id: 'task-2',
           description: 'Another repetitive data entry task',
           status: 'COMPLETED',
           createdAt: new Date('2024-01-03'),
           updatedAt: new Date('2024-01-03'),
           completedAt: new Date('2024-01-04'), // 1 day duration
-          messages: []
-        }
+          messages: [],
+        },
       ];
 
       prisma.task.findMany.mockResolvedValue(mockTasks as any);
