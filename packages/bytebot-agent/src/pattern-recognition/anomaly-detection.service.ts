@@ -18,6 +18,9 @@ export class AnomalyDetectionService {
   private readonly config: AnomalyDetectionConfig;
   private readonly performanceBaselines = new Map<string, PerformanceBaseline>();
   private readonly stateHistory = new Map<string, ApplicationState[]>();
+  private readonly MAX_BASELINE_ENTRIES = 100;
+  private readonly MAX_STATE_HISTORY = 50;
+  private cleanupInterval: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -345,9 +348,12 @@ export class AnomalyDetectionService {
     history.push(state);
 
     // Keep only last 50 states to prevent memory bloat
-    if (history.length > 50) {
+    if (history.length > this.MAX_STATE_HISTORY) {
       history.shift();
     }
+
+    // Cleanup old entries periodically
+    this.cleanupOldEntries();
   }
 
   private async storeError(operation: string, error: ErrorState, context: any): Promise<void> {
@@ -538,5 +544,38 @@ export class AnomalyDetectionService {
   private async runPeriodicAnalysis(): Promise<void> {
     // Periodic analysis of stored data for new anomalies
     this.logger.debug('Running periodic anomaly analysis');
+  }
+
+  private cleanupOldEntries(): void {
+    // Cleanup performance baseline if too large
+    if (this.performanceBaselines.size > this.MAX_BASELINE_ENTRIES) {
+      const entries = Array.from(this.performanceBaselines.entries());
+      const toKeep = entries.slice(-this.MAX_BASELINE_ENTRIES);
+      this.performanceBaselines.clear();
+      toKeep.forEach(([key, value]) => this.performanceBaselines.set(key, value));
+    }
+
+    // Cleanup state history
+    for (const [key, history] of this.stateHistory.entries()) {
+      if (history.length > this.MAX_STATE_HISTORY) {
+        this.stateHistory.set(key, history.slice(-this.MAX_STATE_HISTORY));
+      }
+    }
+  }
+
+  onModuleInit(): void {
+    // Set up periodic cleanup every 5 minutes
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupOldEntries();
+    }, 5 * 60 * 1000);
+  }
+
+  onModuleDestroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    // Clear all maps
+    this.performanceBaselines.clear();
+    this.stateHistory.clear();
   }
 }

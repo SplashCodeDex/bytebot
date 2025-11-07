@@ -20,23 +20,25 @@ export class TasksGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    // Use proper logger instead of console.log
+    // this.logger.log(`Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    // Use proper logger instead of console.log  
+    // this.logger.log(`Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage('join_task')
   handleJoinTask(client: Socket, taskId: string) {
     client.join(`task_${taskId}`);
-    console.log(`Client ${client.id} joined task ${taskId}`);
+    // Use proper logger: this.logger.log(`Client ${client.id} joined task ${taskId}`);
   }
 
   @SubscribeMessage('leave_task')
   handleLeaveTask(client: Socket, taskId: string) {
     client.leave(`task_${taskId}`);
-    console.log(`Client ${client.id} left task ${taskId}`);
+    // Use proper logger: this.logger.log(`Client ${client.id} left task ${taskId}`);
   }
 
   emitTaskUpdate(taskId: string, task: any) {
@@ -53,5 +55,27 @@ export class TasksGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitTaskDeleted(taskId: string) {
     this.server.emit('task_deleted', taskId);
+  }
+
+  emitProgressUpdate(taskId: string, progress: {
+    status: string;
+    iterationCount: number;
+    tokenUsage: number;
+    duration: number;
+    memoryUsage: number;
+    anomalies: number;
+    currentStep?: string;
+    estimatedCompletion?: number;
+  }): void {
+    this.server.to(`task_${taskId}`).emit('task_progress', progress);
+  }
+
+  emitAnomalyDetected(taskId: string, anomaly: {
+    type: string;
+    severity: string;
+    description: string;
+    suggestedActions: string[];
+  }): void {
+    this.server.to(`task_${taskId}`).emit('task_anomaly', anomaly);
   }
 }

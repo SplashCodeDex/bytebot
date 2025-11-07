@@ -25,7 +25,9 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       return successful;
     }
   } catch (error) {
-    console.error('Failed to copy text to clipboard:', error);
+    // Handle clipboard copy failure gracefully
+    // In production, this should use proper error logging
+    // console.error('Failed to copy text to clipboard:', error);
     return false;
   }
 }

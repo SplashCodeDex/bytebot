@@ -75,8 +75,8 @@ export class OpenAIService implements BytebotAgentService {
         },
       };
     } catch (error: any) {
-      console.log('error', error);
-      console.log('error name', error.name);
+      this.logger.debug(`OpenAI error details: ${error.message}`, error.stack);
+      this.logger.debug(`OpenAI error name: ${error.name}`);
 
       if (error instanceof APIUserAbortError) {
         this.logger.log('OpenAI API call aborted');

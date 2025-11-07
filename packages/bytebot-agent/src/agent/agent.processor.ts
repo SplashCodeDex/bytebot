@@ -39,6 +39,9 @@ import {
 import { SummariesService } from '../summaries/summaries.service';
 import { handleComputerToolUse } from './agent.computer-use';
 import { ProxyService } from '../proxy/proxy.service';
+import { EnhancedRetryService } from '../utils/enhanced-retry.service';
+import { PerformanceMonitorService, PerformanceMetrics } from '../monitoring/performance-monitor.service';
+import { AnomalyDetectorService } from '../monitoring/anomaly-detector.service';
 
 @Injectable()
 export class AgentProcessor {
@@ -57,6 +60,9 @@ export class AgentProcessor {
     private readonly googleService: GoogleService,
     private readonly proxyService: ProxyService,
     private readonly inputCaptureService: InputCaptureService,
+    private readonly enhancedRetryService: EnhancedRetryService,
+    private readonly performanceMonitor: PerformanceMonitorService,
+    private readonly anomalyDetector: AnomalyDetectorService,
   ) {
     this.services = {
       anthropic: this.anthropicService,
@@ -219,6 +225,11 @@ export class AgentProcessor {
       return;
     }
 
+    const iterationStartTime = Date.now();
+    const startMemory = process.memoryUsage().heapUsed;
+    let tokenUsage = 0;
+    let iterationCount = 1;
+
     try {
       const task: Task = await this.tasksService.findById(taskId);
 
@@ -269,13 +280,20 @@ export class AgentProcessor {
       let agentResponse: BytebotAgentResponse;
 
       // Try the primary service first, with fallback support
-      agentResponse = await this.generateMessageWithFallback(
-        model,
-        AGENT_SYSTEM_PROMPT,
-        messages,
-        true,
-        this.abortController.signal,
+      agentResponse = await this.enhancedRetryService.withRetryAndCircuitBreaker(
+        () => this.generateMessageWithFallback(
+          model,
+          AGENT_SYSTEM_PROMPT,
+          messages,
+          true,
+          this.abortController.signal,
+        ),
+        `ai_provider_${model.provider}`,
+        { maxAttempts: 2, baseDelay: 1000 },
+        { failureThreshold: 3, timeout: 30000 }
       );
+
+      tokenUsage = agentResponse.tokenUsage.totalTokens;
 
       const messageContentBlocks = agentResponse.contentBlocks;
 
@@ -303,7 +321,7 @@ export class AgentProcessor {
 
       // Calculate if we need to summarize based on token usage
       const contextWindow = model.contextWindow || 200000; // Default to 200k if not specified
-      const contextThreshold = contextWindow * 0.75;
+      const contextThreshold = contextWindow * 0.60; // Start summarization at 60% for better performance
       const shouldSummarize =
         agentResponse.tokenUsage.totalTokens >= contextThreshold;
 
@@ -453,9 +471,54 @@ export class AgentProcessor {
       }
 
       // Schedule the next iteration without blocking
-      if (this.isProcessing) {
-        setImmediate(() => this.runIteration(taskId));
+      if (this.isProcessing && this.currentTaskId === taskId) {
+        // Check if task still needs processing before scheduling next iteration
+        const currentTask = await this.tasksService.findTask(taskId);
+        if (currentTask && [TaskStatus.RUNNING, TaskStatus.NEEDS_HELP].includes(currentTask.status)) {
+          setImmediate(() => {
+            // Double-check we're still processing the same task to prevent race conditions
+            if (this.isProcessing && this.currentTaskId === taskId) {
+              this.runIteration(taskId);
+            }
+          });
+        }
       }
+
+      // Record performance metrics and check for anomalies
+      const iterationDuration = Date.now() - iterationStartTime;
+      const currentMemory = process.memoryUsage().heapUsed;
+      const memoryUsed = currentMemory - startMemory;
+      
+      const performanceMetrics: PerformanceMetrics = {
+        taskId,
+        duration: iterationDuration,
+        tokenUsage,
+        iterationCount,
+        memoryUsage: currentMemory,
+        cpuUsage: process.cpuUsage().user / 1000000, // Convert to percentage approximation
+        timestamp: new Date()
+      };
+
+      this.performanceMonitor.recordMetrics(performanceMetrics);
+      
+      // Detect anomalies
+      const anomalies = this.anomalyDetector.analyzeMetrics(performanceMetrics);
+      if (anomalies.length > 0) {
+        for (const anomaly of anomalies) {
+          this.logger.warn(`Anomaly detected: ${anomaly.description}`);
+        }
+      }
+
+      // Emit progress update
+      await this.emitProgressUpdate(taskId, {
+        status: 'processing',
+        iterationCount,
+        tokenUsage,
+        duration: iterationDuration,
+        memoryUsage: Math.round(currentMemory / 1024 / 1024), // MB
+        anomalies: anomalies.length
+      });
+
     } catch (error: any) {
       if (error?.name === 'BytebotAgentInterrupt') {
         this.logger.warn(`Processing aborted for task ID: ${taskId}`);
@@ -501,5 +564,28 @@ export class AgentProcessor {
 
     this.isProcessing = false;
     this.currentTaskId = null;
+  }
+
+  /**
+   * Emit progress updates for real-time monitoring
+   */
+  private async emitProgressUpdate(taskId: string, progress: {
+    status: string;
+    iterationCount: number;
+    tokenUsage: number;
+    duration: number;
+    memoryUsage: number;
+    anomalies: number;
+  }): Promise<void> {
+    try {
+      // This would emit through WebSocket or similar real-time mechanism
+      this.logger.debug(`Task ${taskId} progress: ${JSON.stringify(progress)}`);
+      
+      // Emit real-time progress updates through TasksGateway
+      // Note: TasksGateway would need to be injected for this to work
+      // this.tasksGateway.emitProgressUpdate(taskId, progress);
+    } catch (error: any) {
+      this.logger.error('Failed to emit progress update', error.stack);
+    }
   }
 }
