@@ -7,18 +7,12 @@ import { MessagesModule } from './messages/messages.module';
 import { AnthropicModule } from './anthropic/anthropic.module';
 import { OpenAIModule } from './openai/openai.module';
 import { GoogleModule } from './google/google.module';
-import { RovoModule } from './rovo/rovo.module';
-import { ExternalServicesModule } from './api-integrations/external-services.module';
-import { TestScenariosController } from './test-scenarios/test-scenarios.controller';
-import { RovoDesktopTestService } from './test-scenarios/rovo-desktop-test.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SummariesModule } from './summaries/summaries.modue';
 import { ProxyModule } from './proxy/proxy.module';
-import { WorkflowModule } from './workflows/workflow.module';
-import { PatternRecognitionModule } from './pattern-recognition/pattern-recognition.module';
 
 @Module({
   imports: [
@@ -34,14 +28,10 @@ import { PatternRecognitionModule } from './pattern-recognition/pattern-recognit
     AnthropicModule,
     OpenAIModule,
     GoogleModule,
-    RovoModule,
-    ExternalServicesModule,
     ProxyModule,
     PrismaModule,
-    WorkflowModule,
-    PatternRecognitionModule,
   ],
-  controllers: [AppController, TestScenariosController],
-  providers: [AppService, RovoDesktopTestService],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
