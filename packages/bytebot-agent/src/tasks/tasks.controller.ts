@@ -14,6 +14,7 @@ import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { Message, Task } from '@prisma/client';
 import { AddTaskMessageDto } from './dto/add-task-message.dto';
+import { GuideTaskDto } from './dto/guide-task.dto';
 import { MessagesService } from '../messages/messages.service';
 import { ANTHROPIC_MODELS } from '../anthropic/anthropic.constants';
 import { OPENAI_MODELS } from '../openai/openai.constants';
@@ -189,5 +190,14 @@ export class TasksController {
   @HttpCode(HttpStatus.OK)
   async cancel(@Param('id') taskId: string): Promise<Task> {
     return this.tasksService.cancel(taskId);
+  }
+
+  @Post(':id/guide')
+  @HttpCode(HttpStatus.CREATED)
+  async guideTask(
+    @Param('id') taskId: string,
+    @Body() guideTaskDto: GuideTaskDto,
+  ): Promise<Task> {
+    return this.tasksService.guideTask(taskId, guideTaskDto);
   }
 }

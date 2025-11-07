@@ -19,6 +19,7 @@ import {
   File,
 } from '@prisma/client';
 import { AddTaskMessageDto } from './dto/add-task-message.dto';
+import { GuideTaskDto } from './dto/guide-task.dto';
 import { TasksGateway } from './tasks.gateway';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -388,5 +389,28 @@ export class TasksService {
     this.tasksGateway.emitTaskUpdate(taskId, updatedTask);
 
     return updatedTask;
+  }
+
+  async guideTask(taskId: string, guideTaskDto: GuideTaskDto): Promise<Task> {
+    // Add the guidance message to the task
+    await this.messagesService.create({
+      taskId,
+      role: 'user',
+      content: guideTaskDto.message,
+    });
+
+    // Update task status to indicate it has new guidance
+    const task = await this.prisma.task.update({
+      where: { id: taskId },
+      data: { 
+        status: 'RUNNING',
+        updatedAt: new Date(),
+      },
+    });
+
+    // Emit event to restart task processing with guidance
+    this.eventEmitter.emit('task.guided', { taskId, guidance: guideTaskDto.message });
+
+    return task;
   }
 }
