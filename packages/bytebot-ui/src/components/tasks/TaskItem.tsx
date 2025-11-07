@@ -103,6 +103,40 @@ export const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
             <span className="text-bytebot-bronze-light-10">
               {formatDate(task.createdAt)}
             </span>
+            {task.error && (
+              <div className="mt-2 max-w-md">
+                <div className={`text-xs px-2 py-1 rounded ${
+                  task.status === TaskStatus.NEEDS_HELP 
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {task.error.includes('quota') || task.error.includes('API') ? (
+                    <div>
+                      <strong>API Quota Issue:</strong> {task.error}
+                      {task.error.includes('quota') && (
+                        <div className="mt-1 text-xs text-amber-600">
+                          💡 <strong>Quick fixes:</strong>
+                          <ul className="mt-1 ml-2 list-disc list-inside">
+                            <li>Check your AI provider billing</li>
+                            <li>Wait for quota reset</li>
+                            <li>Add backup API keys</li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ) : task.error.includes('rate limit') ? (
+                    <div>
+                      <strong>Rate Limited:</strong> {task.error}
+                      <div className="mt-1 text-xs text-amber-600">
+                        💡 Try again in a few minutes
+                      </div>
+                    </div>
+                  ) : (
+                    task.error
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -68,6 +68,89 @@ export class AgentProcessor {
   }
 
   /**
+   * Generate message with automatic fallback to other providers when quota/rate limits are hit
+   */
+  private async generateMessageWithFallback(
+    primaryModel: BytebotAgentModel,
+    systemPrompt: string,
+    messages: Message[],
+    useTools: boolean,
+    signal?: AbortSignal,
+  ): Promise<BytebotAgentResponse> {
+    const fallbackProviders = [
+      { provider: 'google', models: ['gemini-2.5-flash', 'gemini-2.5-pro'] },
+      { provider: 'anthropic', models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'] },
+      { provider: 'openai', models: ['gpt-4o', 'gpt-4o-mini'] },
+    ];
+
+    // Try the primary model first
+    const primaryService = this.services[primaryModel.provider];
+    if (!primaryService) {
+      throw new Error(`No service found for model provider: ${primaryModel.provider}`);
+    }
+
+    try {
+      this.logger.log(`Attempting to use primary model: ${primaryModel.name} (${primaryModel.provider})`);
+      return await primaryService.generateMessage(
+        systemPrompt,
+        messages,
+        primaryModel.name,
+        useTools,
+        signal,
+      );
+    } catch (error: any) {
+      // Check if this is a quota or rate limit error that we can fall back from
+      if (error.name === 'QuotaExceededError' || error.message?.includes('quota') || error.message?.includes('429')) {
+        this.logger.warn(
+          `Primary model ${primaryModel.name} hit quota/rate limit. Attempting fallback...`
+        );
+
+        // Try fallback providers
+        for (const fallback of fallbackProviders) {
+          // Skip the primary provider since it already failed
+          if (fallback.provider === primaryModel.provider) {
+            continue;
+          }
+
+          const fallbackService = this.services[fallback.provider];
+          if (!fallbackService) {
+            this.logger.warn(`Fallback service ${fallback.provider} not available`);
+            continue;
+          }
+
+          for (const modelName of fallback.models) {
+            try {
+              this.logger.log(`Trying fallback: ${modelName} (${fallback.provider})`);
+              const response = await fallbackService.generateMessage(
+                systemPrompt,
+                messages,
+                modelName,
+                useTools,
+                signal,
+              );
+              this.logger.log(`Successfully used fallback model: ${modelName} (${fallback.provider})`);
+              return response;
+            } catch (fallbackError: any) {
+              this.logger.warn(
+                `Fallback model ${modelName} (${fallback.provider}) also failed: ${fallbackError.message}`
+              );
+              continue;
+            }
+          }
+        }
+
+        // If all fallbacks failed, throw the original error with additional context
+        throw new Error(
+          `All AI providers failed. Primary error: ${error.message}. Please check your API keys and quotas.`
+        );
+      }
+
+      // For non-quota errors, throw immediately
+      throw error;
+    }
+  }
+
+  /**
    * Check if the processor is currently processing a task
    */
   isRunning(): boolean {
@@ -185,23 +268,11 @@ export class AgentProcessor {
       const model = task.model as unknown as BytebotAgentModel;
       let agentResponse: BytebotAgentResponse;
 
-      const service = this.services[model.provider];
-      if (!service) {
-        this.logger.warn(
-          `No service found for model provider: ${model.provider}`,
-        );
-        await this.tasksService.update(taskId, {
-          status: TaskStatus.FAILED,
-        });
-        this.isProcessing = false;
-        this.currentTaskId = null;
-        return;
-      }
-
-      agentResponse = await service.generateMessage(
+      // Try the primary service first, with fallback support
+      agentResponse = await this.generateMessageWithFallback(
+        model,
         AGENT_SYSTEM_PROMPT,
         messages,
-        model.name,
         true,
         this.abortController.signal,
       );
@@ -239,7 +310,8 @@ export class AgentProcessor {
       if (shouldSummarize) {
         try {
           // After we've successfully generated a response, we can summarize the unsummarized messages
-          const summaryResponse = await service.generateMessage(
+          const summaryResponse = await this.generateMessageWithFallback(
+            model,
             SUMMARIZATION_SYSTEM_PROMPT,
             [
               ...messages,
@@ -258,7 +330,6 @@ export class AgentProcessor {
                 ],
               },
             ],
-            model.name,
             false,
             this.abortController.signal,
           );
@@ -393,8 +464,22 @@ export class AgentProcessor {
           `Error during task processing iteration for task ID: ${taskId} - ${error.message}`,
           error.stack,
         );
-        await this.tasksService.update(taskId, {
-          status: TaskStatus.FAILED,
+
+        // Determine task status based on error type
+        let taskStatus = TaskStatus.FAILED;
+        let errorMessage = error.message;
+
+        if (error.name === 'QuotaExceededError' || error.message?.includes('quota') || error.message?.includes('All AI providers failed')) {
+          taskStatus = TaskStatus.NEEDS_HELP;
+          errorMessage = `Task paused due to API quota limits. Please check your AI provider billing and quotas, or try again later. Original error: ${error.message}`;
+        } else if (error.message?.includes('rate limit')) {
+          taskStatus = TaskStatus.NEEDS_HELP;
+          errorMessage = `Task paused due to rate limiting. Please wait a moment and try again. Original error: ${error.message}`;
+        }
+
+        await this.tasksService.update(taskId, { 
+          status: taskStatus,
+          error: errorMessage
         });
         this.isProcessing = false;
         this.currentTaskId = null;
