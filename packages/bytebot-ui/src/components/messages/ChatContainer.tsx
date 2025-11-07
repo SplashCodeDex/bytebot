@@ -5,6 +5,8 @@ import { TextShimmer } from "../ui/text-shimmer";
 import { MessageAvatar } from "./MessageAvatar";
 import { Loader } from "../ui/loader";
 import { ChatInput } from "./ChatInput";
+import { InteractionPrompt } from "./InteractionPrompt";
+import { QuickResponses } from "../ui/quick-responses";
 
 interface ChatContainerProps {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
@@ -126,18 +128,41 @@ export function ChatContainer({
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Interaction prompt when AI needs help */}
+          <InteractionPrompt 
+            taskStatus={taskStatus}
+            isWaitingForResponse={taskStatus === TaskStatus.NEEDS_HELP}
+          />
+
           {/* Fixed chat input at bottom */}
-          {[TaskStatus.RUNNING, TaskStatus.NEEDS_HELP].includes(taskStatus) && (
+          {[TaskStatus.RUNNING, TaskStatus.NEEDS_HELP, TaskStatus.PENDING].includes(taskStatus) && (
             <div className="bg-bytebot-bronze-light-3 z-10 flex-shrink-0">
               <div className="border-bytebot-bronze-light-7 rounded-b-lg border-x border-b p-2">
                 <div className="bg-bytebot-bronze-light-2 border-bytebot-bronze-light-7 rounded-lg border p-2">
+                  {/* Quick response buttons */}
+                  <QuickResponses
+                    taskStatus={taskStatus}
+                    onResponseSelect={(response) => {
+                      setInput(response);
+                    }}
+                    isLoading={isLoading}
+                  />
+                  
                   <ChatInput
                     input={input}
                     isLoading={isLoading}
                     onInputChange={setInput}
                     onSend={handleAddMessage}
                     minLines={1}
-                    placeholder="Add more details to your task..."
+                    placeholder={
+                      taskStatus === TaskStatus.NEEDS_HELP 
+                        ? "Answer the AI's question or provide additional information..." 
+                        : taskStatus === TaskStatus.RUNNING
+                        ? "Add more details or ask questions while AI is working..."
+                        : "Add more details to your task..."
+                    }
+                    taskStatus={taskStatus}
+                    disabled={isLoading}
                   />
                 </div>
               </div>

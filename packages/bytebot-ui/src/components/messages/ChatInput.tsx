@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
+import { TaskStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight02Icon, Attachment01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -19,6 +20,8 @@ interface ChatInputProps {
   onFileUpload?: (files: FileWithBase64[]) => void;
   minLines?: number;
   placeholder?: string;
+  taskStatus?: TaskStatus;
+  disabled?: boolean;
 }
 
 export function ChatInput({
@@ -29,6 +32,8 @@ export function ChatInput({
   onFileUpload,
   minLines = 1,
   placeholder = "Give Bytebot a task to work on...",
+  taskStatus,
+  disabled = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

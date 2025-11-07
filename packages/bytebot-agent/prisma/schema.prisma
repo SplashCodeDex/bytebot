@@ -112,3 +112,334 @@ model File {
   taskId        String
 }
 
+// Workflow Management Models
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum WorkflowNodeType {
+  TASK
+  CONDITION
+  LOOP
+  PARALLEL
+  HUMAN_APPROVAL
+  DELAY
+  WEBHOOK
+}
+
+enum WorkflowExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  PAUSED
+}
+
+enum NodeExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+  WAITING_APPROVAL
+}
+
+model Workflow {
+  id                        String              @id @default(uuid())
+  name                      String
+  description               String?
+  version                   String
+  status                    WorkflowStatus      @default(DRAFT)
+  tags                      String[]
+  
+  // Workflow configuration
+  maxExecutionTime          Int                 // milliseconds
+  priority                  Int                 @default(1)
+  allowConcurrentExecutions Boolean             @default(false)
+  retentionDays            Int                 @default(30)
+  
+  // Metadata
+  createdBy                String
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  lastExecutedAt           DateTime?
+  
+  // Relations
+  nodes                    WorkflowNode[]
+  variables                WorkflowVariable[]
+  executions               WorkflowExecution[]
+  schedules                WorkflowSchedule[]
+  patterns                 LearnedPattern[]
+  
+  @@unique([name, version])
+}
+
+model WorkflowNode {
+  id                String              @id @default(uuid())
+  workflowId        String
+  type              WorkflowNodeType
+  name              String
+  description       String?
+  positionX         Float
+  positionY         Float
+  
+  // Configuration stored as JSON
+  config            Json
+  variables         Json?
+  retryPolicy       Json
+  errorAction       Json
+  
+  // Metadata
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  // Relations
+  workflow          Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  dependencies      NodeDependency[]    @relation("NodeDependencies")
+  dependents        NodeDependency[]    @relation("DependentNodes")
+  executions        NodeExecution[]
+}
+
+model NodeDependency {
+  id              String        @id @default(uuid())
+  dependentNodeId String
+  dependsOnNodeId String
+  
+  dependentNode   WorkflowNode  @relation("NodeDependencies", fields: [dependentNodeId], references: [id], onDelete: Cascade)
+  dependsOnNode   WorkflowNode  @relation("DependentNodes", fields: [dependsOnNodeId], references: [id], onDelete: Cascade)
+  
+  @@unique([dependentNodeId, dependsOnNodeId])
+}
+
+model WorkflowVariable {
+  id            String      @id @default(uuid())
+  workflowId    String
+  name          String
+  type          String      // 'string', 'number', 'boolean', 'object', 'array'
+  defaultValue  Json?
+  required      Boolean     @default(false)
+  description   String?
+  validation    Json?       // Validation rules
+  
+  // Relations
+  workflow      Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  @@unique([workflowId, name])
+}
+
+model WorkflowExecution {
+  id                    String                      @id @default(uuid())
+  workflowId            String
+  workflowVersion       String
+  status                WorkflowExecutionStatus     @default(PENDING)
+  
+  // Execution context
+  variables             Json
+  currentNodes          String[]
+  completedNodes        String[]
+  failedNodes           String[]
+  
+  // Timing
+  startedAt             DateTime                    @default(now())
+  completedAt           DateTime?
+  estimatedCompletionAt DateTime?
+  
+  // Results
+  result                Json?
+  error                 String?
+  priority              Int                         @default(1)
+  
+  // Metadata
+  triggeredBy           String
+  triggerData           Json?
+  
+  // Relations
+  workflow              Workflow                    @relation(fields: [workflowId], references: [id])
+  nodeExecutions        NodeExecution[]
+  logs                  WorkflowExecutionLog[]
+  approvals             PendingApproval[]
+  
+  @@index([workflowId, status])
+  @@index([startedAt])
+}
+
+model NodeExecution {
+  id                String                  @id @default(uuid())
+  workflowExecutionId String
+  nodeId            String
+  status            NodeExecutionStatus     @default(PENDING)
+  
+  startedAt         DateTime?
+  completedAt       DateTime?
+  result            Json?
+  error             String?
+  retryCount        Int                     @default(0)
+  logs              String[]
+  
+  // Relations
+  workflowExecution WorkflowExecution       @relation(fields: [workflowExecutionId], references: [id], onDelete: Cascade)
+  node              WorkflowNode            @relation(fields: [nodeId], references: [id])
+  
+  @@unique([workflowExecutionId, nodeId])
+}
+
+model WorkflowExecutionLog {
+  id                String              @id @default(uuid())
+  workflowExecutionId String
+  nodeId            String?
+  timestamp         DateTime            @default(now())
+  level             String              // 'debug', 'info', 'warn', 'error'
+  message           String
+  data              Json?
+  duration          Int?                // milliseconds
+  
+  // Relations
+  workflowExecution WorkflowExecution   @relation(fields: [workflowExecutionId], references: [id], onDelete: Cascade)
+  
+  @@index([workflowExecutionId, timestamp])
+}
+
+model PendingApproval {
+  id                String              @id @default(uuid())
+  workflowExecutionId String
+  nodeId            String
+  approvers         String[]
+  instructions      String
+  requestedAt       DateTime            @default(now())
+  expiresAt         DateTime
+  status            String              @default("pending") // 'pending', 'approved', 'rejected', 'expired'
+  
+  // Relations
+  workflowExecution WorkflowExecution   @relation(fields: [workflowExecutionId], references: [id], onDelete: Cascade)
+  responses         ApprovalResponse[]
+}
+
+model ApprovalResponse {
+  id                String              @id @default(uuid())
+  pendingApprovalId String
+  userId            String
+  decision          String              // 'approve', 'reject'
+  comment           String?
+  respondedAt       DateTime            @default(now())
+  
+  // Relations
+  pendingApproval   PendingApproval     @relation(fields: [pendingApprovalId], references: [id], onDelete: Cascade)
+  
+  @@unique([pendingApprovalId, userId])
+}
+
+model WorkflowSchedule {
+  id                      String      @id @default(uuid())
+  workflowId              String
+  name                    String
+  enabled                 Boolean     @default(true)
+  
+  // Schedule configuration
+  scheduleType            String      // 'cron', 'interval', 'once', 'event'
+  cronExpression          String?
+  intervalMinutes         Int?
+  executeAt               DateTime?
+  eventTriggers           String[]
+  
+  // Execution configuration
+  variables               Json
+  maxConcurrentExecutions Int         @default(1)
+  
+  // Metadata
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  lastExecutedAt          DateTime?
+  nextExecutionAt         DateTime?
+  
+  // Relations
+  workflow                Workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// Pattern Recognition Models
+enum PatternType {
+  VISUAL_ELEMENT
+  USER_INTERACTION
+  APPLICATION_STATE
+  ERROR_PATTERN
+  PERFORMANCE_PATTERN
+}
+
+model LearnedPattern {
+  id              String        @id @default(uuid())
+  workflowId      String?
+  type            PatternType
+  name            String
+  description     String?
+  confidence      Float         // 0.0 to 1.0
+  
+  // Pattern data
+  patternData     Json          // Stores pattern-specific data
+  examples        Json[]        // Example instances of this pattern
+  
+  // Usage statistics
+  matchCount      Int           @default(0)
+  successRate     Float         @default(0.0)
+  lastMatchedAt   DateTime?
+  
+  // Metadata
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  workflow        Workflow?     @relation(fields: [workflowId], references: [id])
+  interactions    UserInteraction[]
+  
+  @@index([type, confidence])
+}
+
+model UserInteraction {
+  id                String          @id @default(uuid())
+  sessionId         String
+  timestamp         DateTime        @default(now())
+  
+  // Interaction details
+  type              String          // 'click', 'type', 'scroll', 'wait', etc.
+  element           Json?           // Element details (xpath, css selector, etc.)
+  data              Json?           // Interaction data (text typed, coordinates, etc.)
+  
+  // Context
+  applicationName   String?
+  windowTitle       String?
+  screenshot        String?         // Base64 encoded screenshot
+  
+  // Pattern matching
+  matchedPatternId  String?
+  automationSuggested Boolean       @default(false)
+  
+  // Relations
+  matchedPattern    LearnedPattern? @relation(fields: [matchedPatternId], references: [id])
+  
+  @@index([sessionId, timestamp])
+  @@index([type, timestamp])
+}
+
+model AnomalyDetection {
+  id                String      @id @default(uuid())
+  type              String      // 'ui_change', 'performance', 'error_rate', 'timeout'
+  severity          String      // 'low', 'medium', 'high', 'critical'
+  description       String
+  
+  // Detection data
+  detectedAt        DateTime    @default(now())
+  context           Json        // Context when anomaly was detected
+  expectedPattern   Json?       // What was expected
+  actualPattern     Json        // What was actually observed
+  
+  // Resolution
+  resolved          Boolean     @default(false)
+  resolvedAt        DateTime?
+  resolution        String?
+  
+  @@index([type, detectedAt])
+  @@index([severity, resolved])
+}
+

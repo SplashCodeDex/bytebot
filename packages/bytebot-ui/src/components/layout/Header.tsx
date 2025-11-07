@@ -73,6 +73,10 @@ export function Header() {
             <HugeiconsIcon icon={TaskDaily01Icon} className="h-4 w-4" />
             <span className="text-sm">Tasks</span>
           </Link>
+          <Link href="/demo" className={getLinkClasses("/demo")}>
+            <span className="text-lg">🚀</span>
+            <span className="text-sm">Demo</span>
+          </Link>
           <Link href="/desktop" className={getLinkClasses("/desktop")}>
             <HugeiconsIcon icon={ComputerIcon} className="h-4 w-4" />
             <span className="text-sm">Desktop</span>

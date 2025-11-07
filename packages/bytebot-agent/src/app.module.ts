@@ -13,6 +13,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SummariesModule } from './summaries/summaries.modue';
 import { ProxyModule } from './proxy/proxy.module';
+import { WorkflowModule } from './workflows/workflow.module';
+import { PatternRecognitionModule } from './pattern-recognition/pattern-recognition.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { ProxyModule } from './proxy/proxy.module';
     GoogleModule,
     ProxyModule,
     PrismaModule,
+    WorkflowModule,
+    PatternRecognitionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
