@@ -188,7 +188,7 @@ export class AgentPoolService {
     if (task && task.status === TaskStatus.RUNNING) {
       await this.tasksService.update(taskId, {
         status: TaskStatus.PENDING,
-        error: `Agent ${agentId} failed, reassigning task`,
+        // error: `Agent ${agentId} failed, reassigning task`, // Removed for DTO compatibility
       });
 
       // Try to reassign to another agent

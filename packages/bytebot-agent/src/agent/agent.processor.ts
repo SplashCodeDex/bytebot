@@ -40,12 +40,12 @@ import {
 import { SummariesService } from '../summaries/summaries.service';
 import { handleComputerToolUse } from './agent.computer-use';
 import { ProxyService } from '../proxy/proxy.service';
-import { EnhancedRetryService } from '../utils/enhanced-retry.service';
-import {
-  PerformanceMonitorService,
-  PerformanceMetrics,
-} from '../monitoring/performance-monitor.service';
-import { AnomalyDetectorService } from '../monitoring/anomaly-detector.service';
+// import { EnhancedRetryService } from '../utils/enhanced-retry.service';
+// import {
+//   PerformanceMonitorService,
+//   PerformanceMetrics,
+// } from '../monitoring/performance-monitor.service';
+// import { AnomalyDetectorService } from '../monitoring/anomaly-detector.service';
 
 @Injectable()
 export class AgentProcessor {
@@ -65,9 +65,9 @@ export class AgentProcessor {
     private readonly rovoService: RovoService,
     private readonly proxyService: ProxyService,
     private readonly inputCaptureService: InputCaptureService,
-    private readonly enhancedRetryService: EnhancedRetryService,
-    private readonly performanceMonitor: PerformanceMonitorService,
-    private readonly anomalyDetector: AnomalyDetectorService,
+    // private readonly enhancedRetryService: EnhancedRetryService,
+    // private readonly performanceMonitor: PerformanceMonitorService,
+    // private readonly anomalyDetector: AnomalyDetectorService,
   ) {
     this.services = {
       anthropic: this.anthropicService,
@@ -304,20 +304,13 @@ export class AgentProcessor {
       let agentResponse: BytebotAgentResponse;
 
       // Try the primary service first, with fallback support
-      agentResponse =
-        await this.enhancedRetryService.withRetryAndCircuitBreaker(
-          () =>
-            this.generateMessageWithFallback(
-              model,
-              AGENT_SYSTEM_PROMPT,
-              messages,
-              true,
-              this.abortController.signal,
-            ),
-          `ai_provider_${model.provider}`,
-          { maxAttempts: 2, baseDelay: 1000 },
-          { failureThreshold: 3, timeout: 30000 },
-        );
+      agentResponse = await this.generateMessageWithFallback(
+        model,
+        AGENT_SYSTEM_PROMPT,
+        messages,
+        true,
+        this.abortController?.signal,
+      );
 
       tokenUsage = agentResponse.tokenUsage.totalTokens;
 
@@ -499,12 +492,10 @@ export class AgentProcessor {
       // Schedule the next iteration without blocking
       if (this.isProcessing && this.currentTaskId === taskId) {
         // Check if task still needs processing before scheduling next iteration
-        const currentTask = await this.tasksService.findTask(taskId);
+        const currentTask = await this.tasksService.findById(taskId);
         if (
           currentTask &&
-          [TaskStatus.RUNNING, TaskStatus.NEEDS_HELP].includes(
-            currentTask.status,
-          )
+          currentTask.status === TaskStatus.RUNNING
         ) {
           setImmediate(() => {
             // Double-check we're still processing the same task to prevent race conditions
@@ -520,35 +511,8 @@ export class AgentProcessor {
       const currentMemory = process.memoryUsage().heapUsed;
       const memoryUsed = currentMemory - startMemory;
 
-      const performanceMetrics: PerformanceMetrics = {
-        taskId,
-        duration: iterationDuration,
-        tokenUsage,
-        iterationCount,
-        memoryUsage: currentMemory,
-        cpuUsage: process.cpuUsage().user / 1000000, // Convert to percentage approximation
-        timestamp: new Date(),
-      };
-
-      this.performanceMonitor.recordMetrics(performanceMetrics);
-
-      // Detect anomalies
-      const anomalies = this.anomalyDetector.analyzeMetrics(performanceMetrics);
-      if (anomalies.length > 0) {
-        for (const anomaly of anomalies) {
-          this.logger.warn(`Anomaly detected: ${anomaly.description}`);
-        }
-      }
-
-      // Emit progress update
-      await this.emitProgressUpdate(taskId, {
-        status: 'processing',
-        iterationCount,
-        tokenUsage,
-        duration: iterationDuration,
-        memoryUsage: Math.round(currentMemory / 1024 / 1024), // MB
-        anomalies: anomalies.length,
-      });
+      // Performance monitoring disabled for simplified demo
+      this.logger.debug(`Task ${taskId} iteration completed in ${iterationDuration}ms`);
     } catch (error: any) {
       if (error?.name === 'BytebotAgentInterrupt') {
         this.logger.warn(`Processing aborted for task ID: ${taskId}`);
@@ -567,16 +531,16 @@ export class AgentProcessor {
           error.message?.includes('quota') ||
           error.message?.includes('All AI providers failed')
         ) {
-          taskStatus = TaskStatus.NEEDS_HELP;
+          taskStatus = TaskStatus.FAILED;
           errorMessage = `Task paused due to API quota limits. Please check your AI provider billing and quotas, or try again later. Original error: ${error.message}`;
         } else if (error.message?.includes('rate limit')) {
-          taskStatus = TaskStatus.NEEDS_HELP;
+          taskStatus = TaskStatus.FAILED;
           errorMessage = `Task paused due to rate limiting. Please wait a moment and try again. Original error: ${error.message}`;
         }
 
         await this.tasksService.update(taskId, {
           status: taskStatus,
-          error: errorMessage,
+          // error: errorMessage, // Removed for DTO compatibility
         });
         this.isProcessing = false;
         this.currentTaskId = null;

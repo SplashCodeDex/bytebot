@@ -253,7 +253,7 @@ export class LoadBalancerService {
       currentUtilization: poolStats.activeAgents / poolStats.totalAgents,
       averageUtilization: avgUtilization,
       currentQueueLength: poolStats.queuedTasks,
-      averageResponseTime,
+      averageResponseTime: avgResponseTime,
       totalTasksProcessed: this.taskResponseTimes.size,
       scalingEvents: {
         scaleUps: 0, // Would track actual scaling events

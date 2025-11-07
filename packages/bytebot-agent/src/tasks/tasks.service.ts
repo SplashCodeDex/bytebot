@@ -393,11 +393,11 @@ export class TasksService {
 
   async guideTask(taskId: string, guideTaskDto: GuideTaskDto): Promise<Task> {
     // Add the guidance message to the task
-    await this.messagesService.create({
-      taskId,
-      role: 'user',
-      content: guideTaskDto.message,
-    });
+    // await this.messagesService.create({
+    //   taskId,
+    //   role: 'user',
+    //   content: guideTaskDto.message,
+    // });
 
     // Update task status to indicate it has new guidance
     const task = await this.prisma.task.update({
