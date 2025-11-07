@@ -205,7 +205,7 @@ export class TaskPatternService {
       commonActions,
       averageDuration,
       successRate,
-      failureReasons: [], // TODO: Extract from failed tasks
+      failureReasons: this.extractFailureReasons(tasks.filter(t => t.status === 'FAILED')),
       suggestedOptimizations: [],
       frequency: tasks.length,
       lastSeen: new Date(Math.max(...tasks.map(t => t.createdAt.getTime())))
@@ -226,6 +226,49 @@ export class TaskPatternService {
     }
 
     return actions;
+  }
+
+  private extractFailureReasons(failedTasks: any[]): string[] {
+    const reasons = new Set<string>();
+    
+    for (const task of failedTasks) {
+      // Extract error messages from task messages
+      if (task.messages) {
+        for (const message of task.messages) {
+          if (message.role === 'assistant' && message.content) {
+            // Look for error indicators in assistant messages
+            const content = typeof message.content === 'string' ? message.content : 
+              Array.isArray(message.content) ? message.content.map(c => c.text || '').join(' ') : '';
+            
+            if (content.toLowerCase().includes('error') || 
+                content.toLowerCase().includes('failed') ||
+                content.toLowerCase().includes('unable')) {
+              // Extract common failure patterns
+              const errorPatterns = [
+                /error[:\s]+([^.!?]+)/i,
+                /failed[:\s]+([^.!?]+)/i,
+                /unable[:\s]+([^.!?]+)/i,
+                /cannot[:\s]+([^.!?]+)/i
+              ];
+              
+              for (const pattern of errorPatterns) {
+                const match = content.match(pattern);
+                if (match && match[1]) {
+                  reasons.add(match[1].trim());
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Also check task error field if it exists
+      if (task.error) {
+        reasons.add(task.error);
+      }
+    }
+    
+    return Array.from(reasons).slice(0, 10); // Limit to top 10 reasons
   }
 
   /**
